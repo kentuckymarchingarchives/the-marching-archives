@@ -4,11 +4,16 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+
 import {
   UUID_PATTERN,
   validateBandFields,
   validateHistoricalName,
 } from "@/lib/band-validation";
+
+import {
+  validateCustomBandSlug,
+} from "@/lib/band-slugs";
 
 async function requireStaff() {
   const supabase = await createClient();
@@ -33,7 +38,9 @@ async function requireStaff() {
     staffError ||
     !staff ||
     staff.status !== "active" ||
-    !["owner", "admin", "editor"].includes(staff.role)
+    !["owner", "admin", "editor"].includes(
+      staff.role
+    )
   ) {
     throw new Error(
       "You do not have permission to manage bands."
@@ -60,13 +67,39 @@ export async function createBand(formData: FormData) {
   const supabase = await requireStaff();
   const values = validateBandFields(formData);
 
+  const rawSlug = formData.get("slug");
+
+  if (
+    rawSlug !== null &&
+    typeof rawSlug !== "string"
+  ) {
+    throw new Error("Invalid custom band URL.");
+  }
+
+  const customSlug = validateCustomBandSlug(
+    rawSlug ?? ""
+  );
+
+  // Without a custom slug, the database trigger
+  // generates a unique URL from the band name.
+  const insertValues = {
+    ...values,
+    ...(customSlug ? { slug: customSlug } : {}),
+  };
+
   const { data, error } = await supabase
     .from("bands")
-    .insert(values)
-    .select("id")
+    .insert(insertValues)
+    .select("id, slug")
     .single();
 
   if (error || !data) {
+    if (error?.code === "23505") {
+      throw new Error(
+        "That band URL is already in use. Choose another custom URL."
+      );
+    }
+
     console.error("Create band:", error?.message);
     throw new Error("Unable to create band.");
   }
@@ -86,7 +119,7 @@ export async function updateBand(formData: FormData) {
     .from("bands")
     .update(values)
     .eq("id", bandId)
-    .select("id")
+    .select("id, slug")
     .single();
 
   if (error || !data) {
@@ -97,7 +130,7 @@ export async function updateBand(formData: FormData) {
   revalidatePath("/staff/bands");
   revalidatePath(`/staff/bands/${bandId}`);
   revalidatePath("/bands");
-  revalidatePath(`/bands/${bandId}`);
+  revalidatePath(`/bands/${data.slug}`);
 
   redirect(`/staff/bands/${bandId}?saved=1`);
 }
@@ -112,7 +145,7 @@ export async function addHistoricalName(
   const { data: band, error: bandError } =
     await supabase
       .from("bands")
-      .select("id")
+      .select("id, slug")
       .eq("id", bandId)
       .maybeSingle();
 
@@ -139,7 +172,7 @@ export async function addHistoricalName(
   }
 
   revalidatePath(`/staff/bands/${bandId}`);
-  revalidatePath(`/bands/${bandId}`);
+  revalidatePath(`/bands/${band.slug}`);
 
   redirect(`/staff/bands/${bandId}?name_added=1`);
 }
@@ -151,6 +184,12 @@ export async function removeHistoricalName(
 
   const bandId = getId(formData, "band_id");
   const nameId = getId(formData, "name_id");
+
+  const { data: band } = await supabase
+    .from("bands")
+    .select("slug")
+    .eq("id", bandId)
+    .maybeSingle();
 
   const { data, error } = await supabase
     .from("band_names")
@@ -167,7 +206,10 @@ export async function removeHistoricalName(
   }
 
   revalidatePath(`/staff/bands/${bandId}`);
-  revalidatePath(`/bands/${bandId}`);
+
+  if (band?.slug) {
+    revalidatePath(`/bands/${band.slug}`);
+  }
 
   redirect(
     `/staff/bands/${bandId}?name_removed=1`

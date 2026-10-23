@@ -4,6 +4,10 @@ import {
   type BandKind,
 } from "@/lib/band-validation";
 
+import {
+  createBandSlug,
+} from "@/lib/band-slugs";
+
 export type BandFormValues = {
   id?: string;
   name: string;
@@ -12,6 +16,7 @@ export type BandFormValues = {
   state: string | null;
   country: string;
   notes: string | null;
+  slug?: string;
 };
 
 type Props = {
@@ -111,6 +116,52 @@ export default function BandForm({
             className={inputClass}
           />
         </label>
+      </div>
+
+      <div className="rounded-xl border border-slate-200 bg-[#F8FAFC] p-5">
+        <h3 className="font-bold text-[#002144]">
+          Public Profile URL
+        </h3>
+
+        {band?.id ? (
+          <>
+            <p className="mt-3 break-all text-sm font-semibold text-[#861F41]">
+              marchingarchives.com/bands/{band.slug}
+            </p>
+
+            <p className="mt-2 text-xs leading-6 text-slate-600">
+              Your existing URL stays the same
+              when the band's name changes.
+            </p>
+          </>
+        ) : (
+          <>
+            <p className="mt-2 text-sm text-slate-600">
+              Leave this blank to generate a URL
+              automatically from the band name.
+            </p>
+
+            <label className="mt-4 block text-sm font-semibold text-[#002144]">
+              Custom URL Slug (Optional)
+
+              <input
+                name="slug"
+                maxLength={150}
+                pattern="[a-z0-9]+(-[a-z0-9]+)*"
+                placeholder="lafayette"
+                className={inputClass}
+              />
+            </label>
+
+            <p className="mt-3 text-xs text-slate-500">
+              Example: Lafayette High School
+              becomes /bands/
+              {createBandSlug("Lafayette High School")}.
+              Only lowercase letters,
+              numbers, and hyphens are allowed.
+            </p>
+          </>
+        )}
       </div>
 
       <label className="block text-sm font-semibold text-[#002144]">
