@@ -17,6 +17,8 @@ import {
   updateBand,
 } from "../actions";
 
+export const instant = false;
+
 type Props = {
   params: Promise<{ id: string }>;
   searchParams: Promise<{
