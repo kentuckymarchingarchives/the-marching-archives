@@ -1,9 +1,16 @@
 
+import { Suspense } from "react";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
+
 import { createClient } from "@/lib/supabase/server";
-import { UUID_PATTERN, type BandKind } from "@/lib/band-validation";
+import {
+  UUID_PATTERN,
+  type BandKind,
+} from "@/lib/band-validation";
+
 import BandForm from "@/components/BandForm";
+
 import {
   addHistoricalName,
   removeHistoricalName,
@@ -20,52 +27,65 @@ type Props = {
   }>;
 };
 
-export default async function EditBandPage({
+async function EditBandContent({
   params,
   searchParams,
 }: Props) {
   const { id } = await params;
   const messages = await searchParams;
 
-  if (!UUID_PATTERN.test(id)) notFound();
+  if (!UUID_PATTERN.test(id)) {
+    notFound();
+  }
 
   const supabase = await createClient();
-  const { data: auth } = await supabase.auth.getClaims();
 
-  if (!auth?.claims?.sub) {
+  // Verify authentication.
+  const { data: auth, error: authError } =
+    await supabase.auth.getClaims();
+
+  if (authError || !auth?.claims?.sub) {
     redirect("/staff/login");
   }
 
-  const { data: staff } = await supabase
-    .from("staff_members")
-    .select("role, status")
-    .eq("user_id", auth.claims.sub)
-    .maybeSingle();
+  // Verify active staff membership.
+  const { data: staff, error: staffError } =
+    await supabase
+      .from("staff_members")
+      .select("role, status")
+      .eq("user_id", auth.claims.sub)
+      .maybeSingle();
 
   if (
-    staff?.status !== "active" ||
+    staffError ||
+    !staff ||
+    staff.status !== "active" ||
     !["owner", "admin", "editor"].includes(
       staff.role
     )
   ) {
-    redirect("/staff/login");
+    redirect("/staff/login?error=unauthorized");
   }
 
+  // Load the band.
   const { data: band, error: bandError } =
     await supabase
       .from("bands")
       .select(
-        "id, name, kind, city, state, country, notes"
+        "id, slug, name, kind, city, state, country, notes"
       )
       .eq("id", id)
       .maybeSingle();
 
   if (bandError) {
-    throw new Error("Unable to load band.");
+    throw new Error("Unable to load band details.");
   }
 
-  if (!band) notFound();
+  if (!band) {
+    notFound();
+  }
 
+  // Load historical names.
   const { data: names, error: namesError } =
     await supabase
       .from("band_names")
@@ -99,7 +119,7 @@ export default async function EditBandPage({
     "mt-2 w-full rounded-lg border border-slate-300 bg-white px-4 py-3 text-sm";
 
   return (
-    <main className="mx-auto max-w-5xl space-y-8 px-5 py-10">
+    <div className="mx-auto max-w-5xl space-y-8 px-5 py-10">
       <Link
         href="/staff/bands"
         className="text-sm font-semibold text-[#861F41]"
@@ -111,11 +131,13 @@ export default async function EditBandPage({
         <p className="text-xs font-bold uppercase tracking-widest text-[#861F41]">
           Edit Archive Record
         </p>
+
         <h1 className="mt-2 font-serif text-4xl font-bold text-[#002144]">
           {band.name}
         </h1>
+
         <Link
-          href={`/bands/${id}`}
+          href={`/bands/${band.slug}`}
           className="mt-3 inline-block text-sm font-semibold text-[#861F41]"
         >
           View public profile →
@@ -161,6 +183,7 @@ export default async function EditBandPage({
                   <p className="font-semibold text-[#002144]">
                     {name.historical_name}
                   </p>
+
                   <p className="mt-1 text-sm text-slate-500">
                     {name.start_year ?? "Unknown"}
                     {" – "}
@@ -174,14 +197,16 @@ export default async function EditBandPage({
                     name="band_id"
                     value={id}
                   />
+
                   <input
                     type="hidden"
                     name="name_id"
                     value={name.id}
                   />
+
                   <button
                     type="submit"
-                    className="rounded-lg border border-red-200 px-4 py-2 text-sm font-bold text-red-700"
+                    className="rounded-lg border border-red-200 px-4 py-2 text-sm font-bold text-red-700 hover:bg-red-50"
                   >
                     Remove
                   </button>
@@ -209,7 +234,7 @@ export default async function EditBandPage({
             Add Historical Name
           </h3>
 
-          <label className="block text-sm font-semibold">
+          <label className="block text-sm font-semibold text-[#002144]">
             Historical Name *
 
             <input
@@ -222,7 +247,7 @@ export default async function EditBandPage({
           </label>
 
           <div className="grid gap-4 sm:grid-cols-2">
-            <label className="block text-sm font-semibold">
+            <label className="block text-sm font-semibold text-[#002144]">
               Start Year
 
               <input
@@ -234,7 +259,7 @@ export default async function EditBandPage({
               />
             </label>
 
-            <label className="block text-sm font-semibold">
+            <label className="block text-sm font-semibold text-[#002144]">
               End Year
 
               <input
@@ -249,12 +274,34 @@ export default async function EditBandPage({
 
           <button
             type="submit"
-            className="rounded-lg bg-[#861F41] px-6 py-3 text-sm font-bold text-white"
+            className="rounded-lg bg-[#861F41] px-6 py-3 text-sm font-bold text-white hover:bg-[#701832]"
           >
             Add Historical Name
           </button>
         </form>
       </section>
+    </div>
+  );
+}
+
+// Static page shell with a Suspense boundary.
+export default function EditBandPage(props: Props) {
+  return (
+    <main className="min-h-screen bg-[#F4F6F9]">
+      <Suspense
+        fallback={
+          <div className="mx-auto max-w-5xl px-5 py-10">
+            <div
+              role="status"
+              className="rounded-2xl border border-slate-200 bg-white p-8 text-sm text-slate-600"
+            >
+              Loading band editor...
+            </div>
+          </div>
+        }
+      >
+        <EditBandContent {...props} />
+      </Suspense>
     </main>
   );
 }
