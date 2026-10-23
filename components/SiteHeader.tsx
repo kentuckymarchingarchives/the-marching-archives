@@ -23,14 +23,18 @@ export default function SiteHeader() {
           aria-label="The Marching Archives homepage"
           className="flex min-w-0 items-center gap-4"
         >
-          <Image
+          
+        <div className="flex h-24 w-24 shrink-0 items-center justify-center rounded-xl bg-white p-2 shadow-sm">
+        <Image
             src="/tma-logo.png"
             alt="The Marching Archives logo"
-            width={72}
-            height={72}
+            width={96}
+            height={96}
             priority
-            className="h-14 w-14 shrink-0 object-contain md:h-[72px] md:w-[72px]"
-          />
+            className="h-full w-full object-contain"
+        />
+        </div>
+
 
           <div className="min-w-0">
             <span className="block font-serif text-lg font-bold tracking-wide md:text-2xl">

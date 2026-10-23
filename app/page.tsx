@@ -1,45 +1,36 @@
 
 import Link from "next/link";
 
+const organizations = [
+  {
+    code: "KMEA",
+    name: "Kentucky Music Educators Association",
+  },
+  {
+    code: "MSBA",
+    name: "Mid-States Band Association",
+  },
+  {
+    code: "BOA",
+    name: "Bands of America",
+  },
+  {
+    code: "DCI",
+    name: "Drum Corps International",
+  },
+];
+
 export default function HomePage() {
   return (
-    <main className="min-h-screen bg-[#F4F6F9]">
-      {/* Navigation */}
-      <header className="border-b border-white/10 bg-[#002144] text-white">
-        <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-5">
-          <Link
-            href="/"
-            className="flex flex-col"
-          >
-            <span className="font-serif text-xl font-bold tracking-wide">
-              The Marching Archives
-            </span>
-            <span className="text-[10px] font-semibold uppercase tracking-[0.2em] text-[#D9AAB9]">
-              Preserving Marching History
-            </span>
-          </Link>
-
-          <nav className="flex items-center gap-5">
-            <Link
-              href="/staff/login"
-              className="rounded-lg border border-white/30 px-4 py-2 text-sm font-semibold transition hover:bg-white/10"
-            >
-              Staff Login
-            </Link>
-          </nav>
-        </div>
-      </header>
-
+    <main className="bg-[#F4F6F9]">
       {/* Hero */}
-      <section className="relative overflow-hidden bg-[#002144] text-white">
-        <div className="absolute -right-20 top-0 h-80 w-80 rounded-full bg-[#861F41]/20 blur-3xl" />
-
-        <div className="relative mx-auto max-w-7xl px-6 py-24 md:py-32">
-          <p className="mb-5 text-xs font-extrabold uppercase tracking-[0.3em] text-[#E0B4C2]">
-            The Marching Archives
+      <section className="bg-[#002144] text-white">
+        <div className="mx-auto max-w-7xl px-6 py-24 md:py-32">
+          <p className="text-xs font-bold uppercase tracking-[0.25em] text-[#E0B4C2]">
+            Welcome to The Marching Archives
           </p>
 
-          <h1 className="max-w-4xl font-serif text-5xl font-bold leading-tight tracking-tight md:text-7xl">
+          <h1 className="mt-6 max-w-4xl font-serif text-5xl font-bold leading-tight md:text-7xl">
             Every Performance.
             <br />
             Every Competition.
@@ -50,84 +41,63 @@ export default function HomePage() {
           </h1>
 
           <p className="mt-8 max-w-2xl text-lg leading-8 text-slate-300">
-            A growing historical archive dedicated to preserving
-            marching band and drum corps competition results,
-            performances, placements, and the organizations
-            that shaped marching history.
+            Preserving the competitive history of
+            marching bands and drum corps through
+            competition results, historical records,
+            scores, and placements.
           </p>
 
-          <div className="mt-10 flex flex-wrap gap-4">
-            <span className="rounded-lg bg-[#861F41] px-6 py-3 text-sm font-bold text-white">
-              Historical Archive in Development
-            </span>
-          </div>
+          <Link
+            href="/bands"
+            className="mt-10 inline-block rounded-lg bg-[#861F41] px-7 py-3 font-bold text-white transition hover:bg-[#A02B52]"
+          >
+            Explore Bands & Corps →
+          </Link>
         </div>
       </section>
 
-      {/* About */}
+      {/* Mission */}
       <section className="mx-auto max-w-7xl px-6 py-20">
-        <div className="grid gap-12 lg:grid-cols-2 lg:items-center">
+        <div className="grid gap-10 lg:grid-cols-2 lg:items-center">
           <div>
-            <p className="text-xs font-extrabold uppercase tracking-[0.2em] text-[#861F41]">
+            <p className="text-xs font-bold uppercase tracking-widest text-[#861F41]">
               Our Mission
             </p>
 
             <h2 className="mt-4 font-serif text-4xl font-bold text-[#002144]">
-              Preserving the History of the Marching Arts
+              Preserving Marching History
             </h2>
 
-            <p className="mt-6 text-base leading-8 text-slate-600">
-              The Marching Archives is dedicated to documenting
-              historical marching band and drum corps competition
-              records in a searchable and organized format.
+            <p className="mt-6 leading-8 text-slate-600">
+              The Marching Archives is an independent
+              historical resource dedicated to documenting
+              the marching arts.
             </p>
 
-            <p className="mt-4 text-base leading-8 text-slate-600">
-              Our goal is to help performers, educators, alumni,
-              researchers, and fans explore decades of competitive
-              marching history through reliable historical records.
+            <p className="mt-4 leading-8 text-slate-600">
+              Our goal is to make historical competition
+              records accessible to performers, educators,
+              alumni, researchers, and fans.
             </p>
           </div>
 
           <div className="rounded-2xl border border-slate-200 bg-white p-8 shadow-sm">
             <h3 className="text-xl font-bold text-[#002144]">
-              What We're Building
+              What You'll Find
             </h3>
 
             <div className="mt-6 space-y-5">
               {[
-                {
-                  title: "Competition Results",
-                  description:
-                    "Historical scores, placements, captions, and championship rounds.",
-                },
-                {
-                  title: "Band & Corps Profiles",
-                  description:
-                    "Organizations, locations, historical names, and competitive histories.",
-                },
-                {
-                  title: "Historical Statistics",
-                  description:
-                    "Research-friendly records and statistics across multiple seasons.",
-                },
-                {
-                  title: "Verified Sources",
-                  description:
-                    "Links to supporting sources and documented competition information.",
-                },
-              ].map((item) => (
+                "Historical Competition Results",
+                "Band & Drum Corps Profiles",
+                "Placements and Caption Scores",
+                "Competitive History and Statistics",
+              ].map((feature) => (
                 <div
-                  key={item.title}
-                  className="border-l-4 border-[#861F41] pl-5"
+                  key={feature}
+                  className="border-l-4 border-[#861F41] py-2 pl-5 font-semibold text-[#002144]"
                 >
-                  <h4 className="font-bold text-[#002144]">
-                    {item.title}
-                  </h4>
-
-                  <p className="mt-2 text-sm leading-6 text-slate-600">
-                    {item.description}
-                  </p>
+                  {feature}
                 </div>
               ))}
             </div>
@@ -139,44 +109,22 @@ export default function HomePage() {
       <section className="bg-white py-20">
         <div className="mx-auto max-w-7xl px-6">
           <div className="text-center">
-            <p className="text-xs font-extrabold uppercase tracking-[0.2em] text-[#861F41]">
+            <p className="text-xs font-bold uppercase tracking-widest text-[#861F41]">
               Competition Coverage
             </p>
 
             <h2 className="mt-4 font-serif text-4xl font-bold text-[#002144]">
               Organizations We're Documenting
             </h2>
-
-            <p className="mx-auto mt-4 max-w-2xl text-slate-600">
-              The archive is being developed to support
-              competition records from these organizations.
-            </p>
           </div>
 
-          <div className="mt-10 grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
-            {[
-              {
-                code: "KMEA",
-                name: "Kentucky Music Educators Association",
-              },
-              {
-                code: "MSBA",
-                name: "Mid-States Band Association",
-              },
-              {
-                code: "BOA",
-                name: "Bands of America",
-              },
-              {
-                code: "DCI",
-                name: "Drum Corps International",
-              },
-            ].map((organization) => (
+          <div className="mt-12 grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
+            {organizations.map((organization) => (
               <div
                 key={organization.code}
-                className="rounded-2xl border border-slate-200 bg-[#F8FAFC] p-7 text-center transition hover:border-[#861F41]"
+                className="rounded-2xl border border-slate-200 bg-[#F8FAFC] p-7 text-center"
               >
-                <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-xl bg-[#002144] text-lg font-black text-white">
+                <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-xl bg-[#002144] font-bold text-white">
                   {organization.code}
                 </div>
 
@@ -189,34 +137,20 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* Development notice */}
+      {/* Development Notice */}
       <section className="mx-auto max-w-7xl px-6 py-20">
-        <div className="rounded-2xl bg-[#002144] px-8 py-12 text-center text-white">
+        <div className="rounded-2xl bg-[#002144] px-8 py-14 text-center text-white">
           <h2 className="font-serif text-3xl font-bold">
-            A New Historical Resource Is Coming
+            Our Archive Is Growing
           </h2>
 
           <p className="mx-auto mt-5 max-w-2xl leading-7 text-slate-300">
-            The Marching Archives is currently under development.
-            Competition results, band profiles, and additional
-            historical records will become available as the
-            archive grows.
+            Competition results, band profiles, and
+            historical records will continue to be
+            added as The Marching Archives develops.
           </p>
         </div>
       </section>
-
-      {/* Footer */}
-      <footer className="border-t border-slate-200 bg-white px-6 py-8">
-        <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-4">
-          <p className="text-sm font-semibold text-[#002144]">
-            © 2026 The Marching Archives          </p>
-
-          <p className="text-xs text-slate-500">
-            An independent historical archive.
-            Not affiliated with KMEA, MSBA, BOA, or DCI.
-          </p>
-        </div>
-      </footer>
     </main>
   );
 }
