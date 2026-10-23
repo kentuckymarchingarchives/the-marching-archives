@@ -209,8 +209,7 @@ export default function HomePage() {
       <footer className="border-t border-slate-200 bg-white px-6 py-8">
         <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-4">
           <p className="text-sm font-semibold text-[#002144]">
-            © {new Date().getFullYear()} The Marching Archives
-          </p>
+            © 2026 The Marching Archives          </p>
 
           <p className="text-xs text-slate-500">
             An independent historical archive.
