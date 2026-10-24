@@ -1,181 +1,234 @@
 
-export default function HomePage() {
+import { Suspense } from "react";
+import Link from "next/link";
+import { createClient } from "@/lib/supabase/server";
+
+type Props = {
+  searchParams: Promise<{
+    q?: string;
+    type?: string;
+  }>;
+};
+
+async function BandDirectory({ searchParams }: Props) {
+  const params = await searchParams;
+
+  const search = (params.q ?? "").trim().slice(0, 100);
+
+  const type =
+    params.type === "marching_band" ||
+    params.type === "drum_corps"
+      ? params.type
+      : "all";
+
+  const supabase = await createClient();
+
+  let query = supabase
+    .from("bands")
+    .select(
+      "id, slug, name, kind, city, state, country"
+    )
+    .order("name", { ascending: true })
+    .limit(100);
+
+  if (search) {
+    query = query.ilike(
+      "name",
+      `%${search.replace(/[%_\\]/g, "\\$&")}%`
+    );
+  }
+
+  if (type !== "all") {
+    query = query.eq("kind", type);
+  }
+
+  const { data: bands, error } = await query;
+
   return (
-    <main className="bg-[#F4F6F9]">
-      {/* Hero Section */}
-      <section className="relative overflow-hidden bg-[#002144] text-white">
-        <div className="absolute -right-20 top-0 h-80 w-80 rounded-full bg-[#861F41]/20 blur-3xl" />
-
-        <div className="relative mx-auto max-w-7xl px-6 py-24 md:py-32">
-          <p className="mb-5 text-xs font-extrabold uppercase tracking-[0.3em] text-[#E0B4C2]">
-            The Marching Archives
-          </p>
-
-          <h1 className="max-w-4xl font-serif text-5xl font-bold leading-tight tracking-tight md:text-7xl">
-            Every Performance.
-            <br />
-            Every Competition.
-            <br />
-            <span className="text-[#DCA6B7]">
-              Every Legacy.
+    <div className="mx-auto max-w-7xl px-6 py-12">
+      {/* Search and filters */}
+      <form
+        method="get"
+        className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm"
+      >
+        <div className="grid gap-4 md:grid-cols-[1fr_220px_auto] md:items-end">
+          <label className="block">
+            <span className="text-sm font-bold text-[#002144]">
+              Search Ensembles
             </span>
-          </h1>
 
-          <p className="mt-8 max-w-2xl text-lg leading-8 text-slate-300">
-            A growing historical archive dedicated to preserving
-            marching band and drum corps competition results,
-            performances, placements, and the organizations
-            that shaped marching history.
-          </p>
+            <input
+              name="q"
+              type="search"
+              defaultValue={search}
+              placeholder="Search by band or corps name..."
+              className="mt-2 w-full rounded-lg border border-slate-300 bg-white px-4 py-3 text-sm text-[#002144] focus:border-[#861F41] focus:outline-none"
+            />
+          </label>
 
-          <div className="mt-10">
-            <span className="inline-block rounded-lg bg-[#861F41] px-6 py-3 text-sm font-bold text-white">
-              Historical Archive in Development
+          <label className="block">
+            <span className="text-sm font-bold text-[#002144]">
+              Ensemble Type
             </span>
-          </div>
+
+            <select
+              name="type"
+              defaultValue={type}
+              className="mt-2 w-full rounded-lg border border-slate-300 bg-white px-4 py-3 text-sm text-[#002144]"
+            >
+              <option value="all">All Ensembles</option>
+              <option value="marching_band">
+                Marching Bands
+              </option>
+              <option value="drum_corps">
+                Drum Corps
+              </option>
+            </select>
+          </label>
+
+          <button
+            type="submit"
+            className="rounded-lg bg-[#861F41] px-7 py-3 text-sm font-bold text-white hover:bg-[#A02B52]"
+          >
+            Search
+          </button>
         </div>
-      </section>
+      </form>
 
-      {/* About Section */}
-      <section className="mx-auto max-w-7xl px-6 py-20">
-        <div className="grid gap-12 lg:grid-cols-2 lg:items-center">
-          <div>
-            <p className="text-xs font-extrabold uppercase tracking-[0.2em] text-[#861F41]">
-              Our Mission
-            </p>
+      {/* Results heading */}
+      <div className="mt-10 mb-5 flex flex-wrap items-center justify-between gap-3">
+        <h2 className="text-2xl font-bold text-[#002144]">
+          {search ? "Search Results" : "Archive Directory"}
+        </h2>
 
-            <h2 className="mt-4 font-serif text-4xl font-bold text-[#002144]">
-              Preserving the History of the Marching Arts
-            </h2>
+        <span className="text-sm text-slate-500">
+          {bands?.length ?? 0} records displayed
+        </span>
+      </div>
 
-            <p className="mt-6 text-base leading-8 text-slate-600">
-              The Marching Archives is dedicated to documenting
-              historical marching band and drum corps competition
-              records in a searchable and organized format.
-            </p>
+      {/* Band results */}
+      {error ? (
+        <div
+          role="alert"
+          className="rounded-xl border border-red-200 bg-red-50 p-6 text-sm text-red-800"
+        >
+          Unable to load the band directory.
+          Please try again.
+        </div>
+      ) : bands?.length ? (
+        <div className="grid gap-4 md:grid-cols-2">
+          {bands.map((band) => (
+            <Link
+              key={band.id}
+              href={`/bands/${band.slug}`}
+              className="group rounded-2xl border border-slate-200 bg-white p-6 shadow-sm transition hover:border-[#861F41] hover:shadow-md"
+            >
+              <div className="flex items-start justify-between gap-4">
+                <div>
+                  <span className="text-xs font-bold uppercase tracking-widest text-[#861F41]">
+                    {band.kind === "drum_corps"
+                      ? "Drum Corps"
+                      : band.kind === "marching_band"
+                        ? "Marching Band"
+                        : "Other Ensemble"}
+                  </span>
 
-            <p className="mt-4 text-base leading-8 text-slate-600">
-              Our goal is to help performers, educators, alumni,
-              researchers, and fans explore decades of competitive
-              marching history through reliable historical records.
-            </p>
-          </div>
+                  <h3 className="mt-2 text-xl font-bold text-[#002144] group-hover:text-[#861F41]">
+                    {band.name}
+                  </h3>
 
-          <div className="rounded-2xl border border-slate-200 bg-white p-8 shadow-sm">
-            <h3 className="text-xl font-bold text-[#002144]">
-              What We're Building
-            </h3>
-
-            <div className="mt-6 space-y-5">
-              {[
-                {
-                  title: "Competition Results",
-                  description:
-                    "Historical scores, placements, captions, and championship rounds.",
-                },
-                {
-                  title: "Band & Corps Profiles",
-                  description:
-                    "Locations, historical names, and competitive histories.",
-                },
-                {
-                  title: "Historical Statistics",
-                  description:
-                    "Research-friendly records and statistics across multiple seasons.",
-                },
-                {
-                  title: "Verified Sources",
-                  description:
-                    "Links to supporting sources and documented competition information.",
-                },
-              ].map((item) => (
-                <div
-                  key={item.title}
-                  className="border-l-4 border-[#861F41] pl-5"
-                >
-                  <h4 className="font-bold text-[#002144]">
-                    {item.title}
-                  </h4>
-
-                  <p className="mt-2 text-sm leading-6 text-slate-600">
-                    {item.description}
+                  <p className="mt-3 text-sm text-slate-500">
+                    {[
+                      band.city,
+                      band.state,
+                      band.country,
+                    ]
+                      .filter(Boolean)
+                      .join(", ")}
                   </p>
                 </div>
-              ))}
-            </div>
-          </div>
-        </div>
-      </section>
 
-      {/* Organizations */}
-      <section className="bg-white py-20">
-        <div className="mx-auto max-w-7xl px-6">
-          <div className="text-center">
-            <p className="text-xs font-extrabold uppercase tracking-[0.2em] text-[#861F41]">
-              Competition Coverage
-            </p>
-
-            <h2 className="mt-4 font-serif text-4xl font-bold text-[#002144]">
-              Organizations We're Documenting
-            </h2>
-
-            <p className="mx-auto mt-4 max-w-2xl text-slate-600">
-              The archive is being developed to support
-              competition records from these organizations.
-            </p>
-          </div>
-
-          <div className="mt-10 grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
-            {[
-              {
-                code: "KMEA",
-                name: "Kentucky Music Educators Association",
-              },
-              {
-                code: "MSBA",
-                name: "Mid-States Band Association",
-              },
-              {
-                code: "BOA",
-                name: "Bands of America",
-              },
-              {
-                code: "DCI",
-                name: "Drum Corps International",
-              },
-            ].map((organization) => (
-              <div
-                key={organization.code}
-                className="rounded-2xl border border-slate-200 bg-[#F8FAFC] p-7 text-center transition hover:border-[#861F41]"
-              >
-                <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-xl bg-[#002144] text-lg font-black text-white">
-                  {organization.code}
-                </div>
-
-                <h3 className="mt-5 font-bold text-[#002144]">
-                  {organization.name}
-                </h3>
+                <span className="text-lg text-[#861F41]">
+                  →
+                </span>
               </div>
-            ))}
-          </div>
+
+              <p className="mt-5 text-xs font-medium text-slate-400">
+                /bands/{band.slug}
+              </p>
+            </Link>
+          ))}
         </div>
-      </section>
+      ) : (
+        <div className="rounded-2xl border border-slate-200 bg-white p-10 text-center">
+          <h3 className="text-xl font-bold text-[#002144]">
+            No ensembles found
+          </h3>
 
-      {/* Development Notice */}
-      <section className="mx-auto max-w-7xl px-6 py-20">
-        <div className="rounded-2xl bg-[#002144] px-8 py-12 text-center text-white">
-          <h2 className="font-serif text-3xl font-bold">
-            A New Historical Resource Is Coming
-          </h2>
+          <p className="mt-3 text-sm text-slate-600">
+            {search || type !== "all"
+              ? "Try adjusting your search or filters."
+              : "The archive does not have any band records yet."}
+          </p>
 
-          <p className="mx-auto mt-5 max-w-2xl leading-7 text-slate-300">
-            The Marching Archives is currently under development.
-            Competition results, band profiles, and additional
-            historical records will become available as the
-            archive grows.
+          {(search || type !== "all") && (
+            <Link
+              href="/bands"
+              className="mt-5 inline-block text-sm font-bold text-[#861F41]"
+            >
+              Clear Filters
+            </Link>
+          )}
+        </div>
+      )}
+
+      <p className="mt-6 text-xs text-slate-500">
+        The directory currently displays up to
+        100 matching records. Pagination will be
+        added as the archive grows.
+      </p>
+    </div>
+  );
+}
+
+export default function BandsPage(props: Props) {
+  return (
+    <main className="min-h-screen bg-[#F4F6F9]">
+      {/* Directory title banner */}
+      <section className="bg-[#002144] px-6 py-16 text-white">
+        <div className="mx-auto max-w-7xl">
+          <p className="text-xs font-bold uppercase tracking-[0.25em] text-[#E0B4C2]">
+            Explore the Archive
+          </p>
+
+          <h1 className="mt-4 font-serif text-4xl font-bold md:text-5xl">
+            Bands & Drum Corps
+          </h1>
+
+          <p className="mt-5 max-w-2xl leading-7 text-slate-300">
+            Discover marching bands and drum corps
+            documented in The Marching Archives.
+            Search for an ensemble to explore
+            its profile and historical records.
           </p>
         </div>
       </section>
+
+      {/* Supabase data loads inside Suspense */}
+      <Suspense
+        fallback={
+          <div className="mx-auto max-w-7xl px-6 py-12">
+            <div
+              role="status"
+              className="rounded-2xl border border-slate-200 bg-white p-8 text-sm text-slate-600"
+            >
+              Loading band directory...
+            </div>
+          </div>
+        }
+      >
+        <BandDirectory searchParams={props.searchParams} />
+      </Suspense>
     </main>
   );
 }
