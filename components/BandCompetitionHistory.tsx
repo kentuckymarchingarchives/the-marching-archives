@@ -3,9 +3,7 @@ import Link from "next/link";
 
 import { createClient } from "@/lib/supabase/server";
 import { UUID_PATTERN } from "@/lib/band-validation";
-import {
-  roundPublicUrl,
-} from "@/lib/public-competition-routes";
+import { roundPublicUrl } from "@/lib/public-competition-routes";
 
 type Props = {
   bandIdentifier: string;
@@ -42,10 +40,8 @@ type Appearance = {
   competition: Competition;
 };
 
-function scoreText(
-  value: number | string | null
-) {
-  if (value === null) return "—";
+function scoreText(value: number | string | null): string {
+  if (value === null || value === undefined) return "—";
 
   const number = Number(value);
 
@@ -60,12 +56,13 @@ function scoreText(
 function rankText(
   value: number | null,
   isTie: boolean
-) {
+): string {
   if (value === null) return "—";
+
   return `${value}${isTie ? " (T)" : ""}`;
 }
 
-function dateText(value: string | null) {
+function dateText(value: string | null): string {
   if (!value) return "Date not recorded";
 
   const date = new Date(`${value}T12:00:00Z`);
@@ -73,9 +70,61 @@ function dateText(value: string | null) {
   return Number.isNaN(date.getTime())
     ? "Date not recorded"
     : date.toLocaleDateString("en-US", {
-        dateStyle: "medium",
+        month: "short",
+        day: "numeric",
+        year: "numeric",
         timeZone: "UTC",
       });
+}
+
+function EmptyHistory({
+  bandName,
+}: {
+  bandName: string;
+}) {
+  return (
+    <div className="rounded-2xl border border-slate-200 bg-white px-6 py-12 text-center shadow-sm sm:px-10">
+      <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-full bg-[#F4F6F9]">
+        <svg
+          viewBox="0 0 24 24"
+          aria-hidden="true"
+          className="h-10 w-10 text-[#861F41]"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.5"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        >
+          <path d="M8 21h8" />
+          <path d="M12 17v4" />
+          <path d="M7 4h10v5a5 5 0 0 1-10 0V4Z" />
+          <path d="M7 6H4v2a4 4 0 0 0 4 4" />
+          <path d="M17 6h3v2a4 4 0 0 1-4 4" />
+          <path d="M9 17h6" />
+        </svg>
+      </div>
+
+      <h3 className="mt-6 font-serif text-2xl font-bold text-[#002144]">
+        No Published Results Yet
+      </h3>
+
+      <p className="mx-auto mt-4 max-w-lg text-sm leading-7 text-slate-600">
+        We don't have any published competition
+        appearances for {bandName} just yet.
+        As historical results are documented,
+        reviewed, and published, they'll appear here
+        automatically.
+      </p>
+
+      <Link
+        href="/competitions"
+        className="mt-7 inline-flex cursor-pointer items-center justify-center gap-2 rounded-lg bg-[#861F41] px-6 py-3 text-sm font-bold text-white transition hover:bg-[#A02B52]"
+      >
+        Browse Competitions
+        <span aria-hidden="true">&rarr;</span>
+      </Link>
+    </div>
+  );
 }
 
 export default async function BandCompetitionHistory({
@@ -83,18 +132,17 @@ export default async function BandCompetitionHistory({
 }: Props) {
   const supabase = await createClient();
 
-  const { data: band, error: bandError } =
-    await supabase
-      .from("bands")
-      .select("id, name")
-      .eq(
-        UUID_PATTERN.test(bandIdentifier)
-          ? "id"
-          : "slug",
-        bandIdentifier
-      )
-      .is("archived_at", null)
-      .maybeSingle();
+  const { data: band, error: bandError } = await supabase
+    .from("bands")
+    .select("id, name")
+    .eq(
+      UUID_PATTERN.test(bandIdentifier)
+        ? "id"
+        : "slug",
+      bandIdentifier
+    )
+    .is("archived_at", null)
+    .maybeSingle();
 
   if (bandError || !band) return null;
 
@@ -109,19 +157,22 @@ export default async function BandCompetitionHistory({
 
   if (error) {
     return (
-      <section className="mx-auto max-w-6xl px-6 py-10">
-        <p role="alert" className="rounded-xl bg-red-50 p-6 text-red-800">
+      <section
+        id="competition-history"
+        className="bg-[#F4F6F9] px-6 py-12"
+      >
+        <div className="mx-auto max-w-6xl rounded-xl border border-red-200 bg-red-50 p-6 text-sm text-red-800">
           Competition history is temporarily unavailable.
-        </p>
+        </div>
       </section>
     );
   }
 
   const entries = (data ?? []) as Entry[];
 
-  const roundIds = [...new Set(
-    entries.map((entry) => entry.round_id)
-  )];
+  const roundIds = [
+    ...new Set(entries.map((entry) => entry.round_id)),
+  ];
 
   let rounds: Round[] = [];
 
@@ -134,16 +185,18 @@ export default async function BandCompetitionHistory({
 
     if (result.error) {
       throw new Error(
-        "Unable to load historical rounds."
+        "Unable to load historical competition rounds."
       );
     }
 
     rounds = (result.data ?? []) as Round[];
   }
 
-  const competitionIds = [...new Set(
-    rounds.map((round) => round.competition_id)
-  )];
+  const competitionIds = [
+    ...new Set(
+      rounds.map((round) => round.competition_id)
+    ),
+  ];
 
   let competitions: Competition[] = [];
 
@@ -159,12 +212,11 @@ export default async function BandCompetitionHistory({
 
     if (result.error) {
       throw new Error(
-        "Unable to load published history."
+        "Unable to load published competition history."
       );
     }
 
-    competitions =
-      (result.data ?? []) as Competition[];
+    competitions = (result.data ?? []) as Competition[];
   }
 
   const roundMap = new Map(
@@ -203,42 +255,45 @@ export default async function BandCompetitionHistory({
       b.competition.season_year -
       a.competition.season_year;
 
-    if (yearDifference) return yearDifference;
+    if (yearDifference !== 0) return yearDifference;
 
-    const dateDifference =
-      (b.competition.competition_date ?? "")
-        .localeCompare(
-          a.competition.competition_date ?? ""
-        );
+    const dateDifference = (
+      b.competition.competition_date ?? ""
+    ).localeCompare(
+      a.competition.competition_date ?? ""
+    );
 
-    if (dateDifference) return dateDifference;
+    if (dateDifference !== 0) return dateDifference;
 
     const nameDifference =
       a.competition.name.localeCompare(
         b.competition.name
       );
 
-    if (nameDifference) return nameDifference;
+    if (nameDifference !== 0) return nameDifference;
 
     return a.round.name.localeCompare(b.round.name);
   });
 
   const grouped = new Map<number, Appearance[]>();
 
-  for (const item of appearances) {
-    const year = item.competition.season_year;
+  for (const appearance of appearances) {
+    const year = appearance.competition.season_year;
 
     grouped.set(
       year,
-      [...(grouped.get(year) ?? []), item]
+      [
+        ...(grouped.get(year) ?? []),
+        appearance,
+      ]
     );
   }
 
-  // Check ties against the other public entries
-  // in each round, not merely identical total scores.
-  const publicRoundIds = [...new Set(
-    appearances.map((item) => item.round.id)
-  )];
+  const publicRoundIds = [
+    ...new Set(
+      appearances.map((item) => item.round.id)
+    ),
+  ];
 
   const tieKeys = new Set<string>();
   let tieCheckComplete = true;
@@ -255,7 +310,8 @@ export default async function BandCompetitionHistory({
 
     if (
       result.error ||
-      (result.count ?? 0) > (result.data?.length ?? 0)
+      (result.count ?? 0) >
+        (result.data?.length ?? 0)
     ) {
       tieCheckComplete = false;
     } else {
@@ -266,7 +322,10 @@ export default async function BandCompetitionHistory({
           const key =
             `overall:${row.round_id}:${row.overall_placement}`;
 
-          counts.set(key, (counts.get(key) ?? 0) + 1);
+          counts.set(
+            key,
+            (counts.get(key) ?? 0) + 1
+          );
         }
 
         if (
@@ -276,190 +335,248 @@ export default async function BandCompetitionHistory({
           const key =
             `class:${row.round_id}:${row.classification}:${row.class_placement}`;
 
-          counts.set(key, (counts.get(key) ?? 0) + 1);
+          counts.set(
+            key,
+            (counts.get(key) ?? 0) + 1
+          );
         }
       }
 
       for (const [key, amount] of counts) {
-        if (amount > 1) tieKeys.add(key);
+        if (amount > 1) {
+          tieKeys.add(key);
+        }
       }
     }
   }
 
-  const incomplete = (count ?? 0) > entries.length;
+  const incomplete =
+    (count ?? 0) > entries.length;
 
   return (
     <section
       id="competition-history"
-      className="mx-auto max-w-6xl space-y-8 px-6 py-12"
+      className="scroll-mt-8 border-t border-slate-200 bg-[#F4F6F9] px-6 py-16"
     >
-      <div className="flex flex-wrap items-end justify-between gap-4">
-        <div>
-          <p className="text-xs font-bold uppercase tracking-widest text-[#861F41]">
-            Historical Records
-          </p>
+      <div className="mx-auto max-w-6xl space-y-9">
+        {/* Section heading */}
+        <div className="flex flex-wrap items-end justify-between gap-5">
+          <div>
+            <p className="text-xs font-bold uppercase tracking-[0.18em] text-[#861F41]">
+              Historical Records
+            </p>
 
-          <h2 className="mt-3 font-serif text-3xl font-bold text-[#002144]">
-            Competition History
-          </h2>
+            <h2 className="mt-3 font-serif text-3xl font-bold text-[#002144] md:text-4xl">
+              Competition History
+            </h2>
 
-          <p className="mt-3 text-sm leading-7 text-slate-600">
-            Published appearances for {band.name},
-            organized by season.
-          </p>
-        </div>
-
-        <span className="rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-bold text-[#002144]">
-          {appearances.length}{" "}
-          {appearances.length === 1
-            ? "Appearance"
-            : "Appearances"}
-        </span>
-      </div>
-
-      {(incomplete || !tieCheckComplete) && (
-        <p
-          role="status"
-          className="rounded-xl border border-amber-200 bg-amber-50 p-5 text-sm text-amber-900"
-        >
-          {incomplete
-            ? "Additional historical entries may exist beyond the display limit."
-            : "Tie markers could not be verified for every entry."}
-        </p>
-      )}
-
-      {appearances.length === 0 && (
-        <div className="rounded-2xl border border-slate-200 bg-white p-8">
-          <p className="text-sm leading-7 text-slate-600">
-            No published competition appearances are
-            currently available for this ensemble.
-          </p>
-
-          <Link
-            href="/competitions"
-            className="mt-4 inline-block text-sm font-bold text-[#861F41]"
-          >
-            Browse Competitions →
-          </Link>
-        </div>
-      )}
-
-      {[...grouped.entries()].map(([year, items]) => (
-        <section key={year} className="space-y-4">
-          <div className="flex items-center justify-between">
-            <h3 className="text-2xl font-bold text-[#002144]">
-              {year} Season
-            </h3>
-            <span className="text-sm text-slate-500">
-              {items.length} appearances
-            </span>
+            <p className="mt-3 max-w-2xl text-sm leading-7 text-slate-600">
+              Explore {band.name}'s documented
+              competition appearances, organized by season.
+            </p>
           </div>
 
-          <div className="overflow-x-auto rounded-2xl border border-slate-200 bg-white shadow-sm">
-            <table className="w-full min-w-[750px] text-left text-sm">
-              <thead className="bg-[#002144] text-white">
-                <tr>
-                  <th className="px-5 py-4">
-                    Competition / Round
-                  </th>
-                  <th className="px-5 py-4">Class</th>
-                  <th className="px-5 py-4">Class Place</th>
-                  <th className="px-5 py-4">Overall</th>
-                  <th className="px-5 py-4 text-right">
-                    Score
-                  </th>
-                </tr>
-              </thead>
+          <span className="rounded-full border border-slate-200 bg-white px-5 py-2 text-sm font-bold text-[#002144] shadow-sm">
+            {appearances.length}{" "}
+            {appearances.length === 1
+              ? "Appearance"
+              : "Appearances"}
+          </span>
+        </div>
 
-              <tbody className="divide-y divide-slate-100">
-                {items.map((item) => {
-                  const { entry, round, competition } =
-                    item;
+        {/* Empty state */}
+        {appearances.length === 0 ? (
+          <EmptyHistory bandName={band.name} />
+        ) : (
+          <>
+            {(incomplete || !tieCheckComplete) && (
+              <div
+                role="status"
+                className="rounded-xl border border-amber-200 bg-amber-50 p-5 text-sm leading-6 text-amber-900"
+              >
+                {incomplete
+                  ? "Additional historical appearances may exist beyond the current display limit."
+                  : "Tie markers could not be verified for every entry. Recorded placements are still displayed."}
+              </div>
+            )}
 
-                  const overallTie =
-                    tieCheckComplete &&
-                    entry.overall_placement !== null &&
-                    tieKeys.has(
-                      `overall:${round.id}:${entry.overall_placement}`
-                    );
+            {/* Season-by-season history */}
+            {[...grouped.entries()].map(([year, items]) => (
+              <section
+                key={year}
+                className="space-y-4"
+              >
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div className="flex items-center gap-3">
+                    <span
+                      aria-hidden="true"
+                      className="h-8 w-1 rounded-full bg-[#861F41]"
+                    />
 
-                  const classTie =
-                    tieCheckComplete &&
-                    entry.classification !== null &&
-                    entry.class_placement !== null &&
-                    tieKeys.has(
-                      `class:${round.id}:${entry.classification}:${entry.class_placement}`
-                    );
+                    <h3 className="font-serif text-2xl font-bold text-[#002144]">
+                      {year} Season
+                    </h3>
+                  </div>
 
-                  return (
-                    <tr key={entry.id}>
-                      <td className="px-5 py-4">
-                        <Link
-                          href={roundPublicUrl(
-                            competition.slug,
-                            round.slug
-                          )}
-                          className="font-bold text-[#002144] hover:text-[#861F41] hover:underline"
+                  <span className="text-sm font-medium text-slate-500">
+                    {items.length}{" "}
+                    {items.length === 1
+                      ? "appearance"
+                      : "appearances"}
+                  </span>
+                </div>
+
+                <div className="overflow-x-auto rounded-2xl border border-slate-200 bg-white shadow-sm">
+                  <table className="w-full min-w-[760px] text-left text-sm">
+                    <thead className="bg-[#002144] text-white">
+                      <tr>
+                        <th
+                          scope="col"
+                          className="px-5 py-4"
                         >
-                          {competition.name}
-                        </Link>
+                          Competition / Round
+                        </th>
 
-                        <p className="mt-1 text-sm text-slate-600">
-                          {round.name}
-                          {" · "}
-                          {competition.organization_code}
-                        </p>
+                        <th
+                          scope="col"
+                          className="px-5 py-4"
+                        >
+                          Class
+                        </th>
 
-                        <p className="mt-1 text-xs text-slate-500">
-                          {dateText(
-                            competition.competition_date
-                          )}
-                        </p>
-                      </td>
+                        <th
+                          scope="col"
+                          className="px-5 py-4"
+                        >
+                          Class Place
+                        </th>
 
-                      <td className="px-5 py-4">
-                        {entry.classification ?? "—"}
-                      </td>
+                        <th
+                          scope="col"
+                          className="px-5 py-4"
+                        >
+                          Overall
+                        </th>
 
-                      <td className="px-5 py-4 font-semibold">
-                        {rankText(
-                          entry.class_placement,
-                          classTie
-                        )}
-                      </td>
+                        <th
+                          scope="col"
+                          className="px-5 py-4 text-right"
+                        >
+                          Score
+                        </th>
+                      </tr>
+                    </thead>
 
-                      <td className="px-5 py-4 font-semibold">
-                        {rankText(
-                          entry.overall_placement,
-                          overallTie
-                        )}
-                      </td>
+                    <tbody className="divide-y divide-slate-100">
+                      {items.map((item) => {
+                        const {
+                          entry,
+                          round,
+                          competition,
+                        } = item;
 
-                      <td className="px-5 py-4 text-right font-bold tabular-nums text-[#002144]">
-                        {scoreText(entry.total_score)}
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        </section>
-      ))}
+                        const overallTie =
+                          tieCheckComplete &&
+                          entry.overall_placement !== null &&
+                          tieKeys.has(
+                            `overall:${round.id}:${entry.overall_placement}`
+                          );
 
-      <p className="text-xs leading-6 text-slate-500">
-        (T) indicates a shared recorded placement.
-        Different historical scoring systems may
-        not be directly comparable. Missing values
-        are displayed as —.
-      </p>
+                        const classTie =
+                          tieCheckComplete &&
+                          entry.classification !== null &&
+                          entry.class_placement !== null &&
+                          tieKeys.has(
+                            `class:${round.id}:${entry.classification}:${entry.class_placement}`
+                          );
 
-      <Link
-        href="/competitions"
-        className="inline-block rounded-lg border border-slate-300 bg-white px-6 py-3 text-sm font-bold text-[#002144]"
-      >
-        Browse Competition Archive →
-      </Link>
+                        return (
+                          <tr
+                            key={entry.id}
+                            className="transition hover:bg-slate-50"
+                          >
+                            <td className="px-5 py-5">
+                              <Link
+                                href={roundPublicUrl(
+                                  competition.slug,
+                                  round.slug
+                                )}
+                                className="font-bold text-[#002144] hover:text-[#861F41] hover:underline"
+                              >
+                                {competition.name}
+                                <span
+                                  aria-hidden="true"
+                                  className="ml-2 text-[#861F41]"
+                                >
+                                  &rarr;
+                                </span>
+                              </Link>
+
+                              <p className="mt-2 text-sm text-slate-600">
+                                {round.name}
+                                {" · "}
+                                {competition.organization_code}
+                              </p>
+
+                              <p className="mt-1 text-xs text-slate-500">
+                                {dateText(
+                                  competition.competition_date
+                                )}
+                              </p>
+                            </td>
+
+                            <td className="px-5 py-5 text-slate-700">
+                              {entry.classification ?? "—"}
+                            </td>
+
+                            <td className="px-5 py-5 font-semibold text-[#002144]">
+                              {rankText(
+                                entry.class_placement,
+                                classTie
+                              )}
+                            </td>
+
+                            <td className="px-5 py-5 font-semibold text-[#002144]">
+                              {rankText(
+                                entry.overall_placement,
+                                overallTie
+                              )}
+                            </td>
+
+                            <td className="px-5 py-5 text-right font-bold tabular-nums text-[#002144]">
+                              {scoreText(
+                                entry.total_score
+                              )}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </section>
+            ))}
+
+            {/* Footnote and archive navigation */}
+            <div className="flex flex-wrap items-center justify-between gap-5 border-t border-slate-200 pt-7">
+              <p className="max-w-2xl text-xs leading-6 text-slate-500">
+                (T) indicates a shared recorded placement.
+                Historical scoring systems may differ
+                between organizations and seasons.
+                Missing values are shown as —.
+              </p>
+
+              <Link
+                href="/competitions"
+                className="inline-flex cursor-pointer items-center gap-2 rounded-lg bg-[#002144] px-5 py-3 text-sm font-bold text-white transition hover:bg-[#123B63]"
+              >
+                Browse Competitions
+                <span aria-hidden="true">&rarr;</span>
+              </Link>
+            </div>
+          </>
+        )}
+      </div>
     </section>
   );
 }
