@@ -1,24 +1,10 @@
 
+import Image from "next/image";
 import Link from "next/link";
 
-const organizations = [
-  {
-    code: "KMEA",
-    name: "Kentucky Music Educators Association",
-  },
-  {
-    code: "MSBA",
-    name: "Mid-States Band Association",
-  },
-  {
-    code: "BOA",
-    name: "Bands of America",
-  },
-  {
-    code: "DCI",
-    name: "Drum Corps International",
-  },
-];
+import {
+  ORGANIZATION_LIST,
+} from "@/lib/organization-branding";
 
 export default function HomePage() {
   return (
@@ -49,9 +35,9 @@ export default function HomePage() {
 
           <Link
             href="/bands"
-            className="mt-10 inline-block rounded-lg bg-[#861F41] px-7 py-3 font-bold text-white transition hover:bg-[#A02B52]"
+            className="mt-10 inline-block cursor-pointer rounded-lg bg-[#861F41] px-7 py-3 font-bold text-white transition hover:bg-[#A02B52]"
           >
-            Explore Bands & Corps →
+            Explore Bands & Corps &rarr;
           </Link>
         </div>
       </section>
@@ -119,21 +105,65 @@ export default function HomePage() {
           </div>
 
           <div className="mt-12 grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
-            {organizations.map((organization) => (
+            {ORGANIZATION_LIST.map((organization) => (
               <div
                 key={organization.code}
-                className="rounded-2xl border border-slate-200 bg-[#F8FAFC] p-7 text-center"
+                className="flex flex-col items-center rounded-2xl border border-slate-200 bg-[#F8FAFC] p-7 text-center transition hover:border-[#861F41] hover:shadow-md"
               >
-                <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-xl bg-[#002144] font-bold text-white">
-                  {organization.code}
-                </div>
+                <a
+                  href={organization.website}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  aria-label={`Visit the official ${organization.name} website`}
+                  title={`Visit ${organization.name}`}
+                  className="flex h-28 w-full cursor-pointer items-center justify-center rounded-xl bg-white p-4 transition hover:bg-slate-50"
+                >
+                  <Image
+                    src={organization.logo}
+                    alt={`${organization.name} logo`}
+                    width={240}
+                    height={130}
+                    sizes="(max-width: 640px) 240px, 200px"
+                    className="max-h-full w-auto max-w-full object-contain"
+                  />
+                </a>
 
-                <h3 className="mt-5 font-bold text-[#002144]">
+                <h3 className="mt-5 text-lg font-bold text-[#002144]">
                   {organization.name}
                 </h3>
+
+                <p className="mt-2 text-xs font-semibold uppercase tracking-wider text-slate-500">
+                  {organization.code}
+                </p>
+
+                <a
+                  href={organization.website}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="mt-5 cursor-pointer text-sm font-bold text-[#861F41] hover:underline"
+                >
+                  Official Website &nearr;
+                </a>
               </div>
             ))}
           </div>
+
+          <div className="mt-10 text-center">
+            <Link
+              href="/organizations"
+              className="inline-block cursor-pointer rounded-lg bg-[#002144] px-7 py-3 text-sm font-bold text-white transition hover:bg-[#123B63]"
+            >
+              Explore All Organizations &rarr;
+            </Link>
+          </div>
+
+          <p className="mx-auto mt-6 max-w-3xl text-center text-xs leading-6 text-slate-500">
+            The Marching Archives is an independent
+            historical resource and is not affiliated
+            with or endorsed by the organizations listed.
+            Their logos and trademarks belong to their
+            respective owners.
+          </p>
         </div>
       </section>
 
