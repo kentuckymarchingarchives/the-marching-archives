@@ -4,6 +4,7 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { UUID_PATTERN } from "@/lib/band-validation";
 import { roundPublicUrl } from "@/lib/public-competition-routes";
+import OrganizationMark from "@/components/OrganizationMark";
 
 type Props = {
   bandIdentifier: string;
@@ -40,7 +41,9 @@ type Appearance = {
   competition: Competition;
 };
 
-function scoreText(value: number | string | null): string {
+function scoreText(
+  value: number | string | null
+): string {
   if (value === null || value === undefined) return "—";
 
   const number = Number(value);
@@ -55,11 +58,10 @@ function scoreText(value: number | string | null): string {
 
 function rankText(
   value: number | null,
-  isTie: boolean
+  tied: boolean
 ): string {
   if (value === null) return "—";
-
-  return `${value}${isTie ? " (T)" : ""}`;
+  return `${value}${tied ? " (T)" : ""}`;
 }
 
 function dateText(value: string | null): string {
@@ -77,11 +79,7 @@ function dateText(value: string | null): string {
       });
 }
 
-function EmptyHistory({
-  bandName,
-}: {
-  bandName: string;
-}) {
+function EmptyHistory({ bandName }: { bandName: string }) {
   return (
     <div className="rounded-2xl border border-slate-200 bg-white px-6 py-12 text-center shadow-sm sm:px-10">
       <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-full bg-[#F4F6F9]">
@@ -112,8 +110,8 @@ function EmptyHistory({
         We don't have any published competition
         appearances for {bandName} just yet.
         As historical results are documented,
-        reviewed, and published, they'll appear here
-        automatically.
+        reviewed, and published, they'll appear
+        here automatically.
       </p>
 
       <Link
@@ -132,17 +130,18 @@ export default async function BandCompetitionHistory({
 }: Props) {
   const supabase = await createClient();
 
-  const { data: band, error: bandError } = await supabase
-    .from("bands")
-    .select("id, name")
-    .eq(
-      UUID_PATTERN.test(bandIdentifier)
-        ? "id"
-        : "slug",
-      bandIdentifier
-    )
-    .is("archived_at", null)
-    .maybeSingle();
+  const { data: band, error: bandError } =
+    await supabase
+      .from("bands")
+      .select("id, name")
+      .eq(
+        UUID_PATTERN.test(bandIdentifier)
+          ? "id"
+          : "slug",
+        bandIdentifier
+      )
+      .is("archived_at", null)
+      .maybeSingle();
 
   if (bandError || !band) return null;
 
@@ -216,7 +215,8 @@ export default async function BandCompetitionHistory({
       );
     }
 
-    competitions = (result.data ?? []) as Competition[];
+    competitions =
+      (result.data ?? []) as Competition[];
   }
 
   const roundMap = new Map(
@@ -280,13 +280,10 @@ export default async function BandCompetitionHistory({
   for (const appearance of appearances) {
     const year = appearance.competition.season_year;
 
-    grouped.set(
-      year,
-      [
-        ...(grouped.get(year) ?? []),
-        appearance,
-      ]
-    );
+    grouped.set(year, [
+      ...(grouped.get(year) ?? []),
+      appearance,
+    ]);
   }
 
   const publicRoundIds = [
@@ -310,8 +307,7 @@ export default async function BandCompetitionHistory({
 
     if (
       result.error ||
-      (result.count ?? 0) >
-        (result.data?.length ?? 0)
+      (result.count ?? 0) > (result.data?.length ?? 0)
     ) {
       tieCheckComplete = false;
     } else {
@@ -343,15 +339,12 @@ export default async function BandCompetitionHistory({
       }
 
       for (const [key, amount] of counts) {
-        if (amount > 1) {
-          tieKeys.add(key);
-        }
+        if (amount > 1) tieKeys.add(key);
       }
     }
   }
 
-  const incomplete =
-    (count ?? 0) > entries.length;
+  const incomplete = (count ?? 0) > entries.length;
 
   return (
     <section
@@ -359,7 +352,6 @@ export default async function BandCompetitionHistory({
       className="scroll-mt-8 border-t border-slate-200 bg-[#F4F6F9] px-6 py-16"
     >
       <div className="mx-auto max-w-6xl space-y-9">
-        {/* Section heading */}
         <div className="flex flex-wrap items-end justify-between gap-5">
           <div>
             <p className="text-xs font-bold uppercase tracking-[0.18em] text-[#861F41]">
@@ -384,7 +376,6 @@ export default async function BandCompetitionHistory({
           </span>
         </div>
 
-        {/* Empty state */}
         {appearances.length === 0 ? (
           <EmptyHistory bandName={band.name} />
         ) : (
@@ -392,15 +383,14 @@ export default async function BandCompetitionHistory({
             {(incomplete || !tieCheckComplete) && (
               <div
                 role="status"
-                className="rounded-xl border border-amber-200 bg-amber-50 p-5 text-sm leading-6 text-amber-900"
+                className="rounded-xl border border-amber-200 bg-amber-50 p-5 text-sm text-amber-900"
               >
                 {incomplete
-                  ? "Additional historical appearances may exist beyond the current display limit."
-                  : "Tie markers could not be verified for every entry. Recorded placements are still displayed."}
+                  ? "Additional appearances may exist beyond the display limit."
+                  : "Tie information could not be verified for every result."}
               </div>
             )}
 
-            {/* Season-by-season history */}
             {[...grouped.entries()].map(([year, items]) => (
               <section
                 key={year}
@@ -427,37 +417,21 @@ export default async function BandCompetitionHistory({
                 </div>
 
                 <div className="overflow-x-auto rounded-2xl border border-slate-200 bg-white shadow-sm">
-                  <table className="w-full min-w-[760px] text-left text-sm">
+                  <table className="w-full min-w-[790px] text-left text-sm">
                     <thead className="bg-[#002144] text-white">
                       <tr>
-                        <th
-                          scope="col"
-                          className="px-5 py-4"
-                        >
+                        <th scope="col" className="px-5 py-4">
                           Competition / Round
                         </th>
-
-                        <th
-                          scope="col"
-                          className="px-5 py-4"
-                        >
+                        <th scope="col" className="px-5 py-4">
                           Class
                         </th>
-
-                        <th
-                          scope="col"
-                          className="px-5 py-4"
-                        >
+                        <th scope="col" className="px-5 py-4">
                           Class Place
                         </th>
-
-                        <th
-                          scope="col"
-                          className="px-5 py-4"
-                        >
+                        <th scope="col" className="px-5 py-4">
                           Overall
                         </th>
-
                         <th
                           scope="col"
                           className="px-5 py-4 text-right"
@@ -496,33 +470,42 @@ export default async function BandCompetitionHistory({
                             className="transition hover:bg-slate-50"
                           >
                             <td className="px-5 py-5">
-                              <Link
-                                href={roundPublicUrl(
-                                  competition.slug,
-                                  round.slug
-                                )}
-                                className="font-bold text-[#002144] hover:text-[#861F41] hover:underline"
-                              >
-                                {competition.name}
-                                <span
-                                  aria-hidden="true"
-                                  className="ml-2 text-[#861F41]"
-                                >
-                                  &rarr;
-                                </span>
-                              </Link>
+                              <div className="flex items-center gap-4">
+                                <OrganizationMark
+                                  code={competition.organization_code}
+                                  size="small"
+                                />
 
-                              <p className="mt-2 text-sm text-slate-600">
-                                {round.name}
-                                {" · "}
-                                {competition.organization_code}
-                              </p>
+                                <div className="min-w-0">
+                                  <Link
+                                    href={roundPublicUrl(
+                                      competition.slug,
+                                      round.slug
+                                    )}
+                                    className="font-bold text-[#002144] hover:text-[#861F41] hover:underline"
+                                  >
+                                    {competition.name}
+                                    <span
+                                      aria-hidden="true"
+                                      className="ml-2 text-[#861F41]"
+                                    >
+                                      &rarr;
+                                    </span>
+                                  </Link>
 
-                              <p className="mt-1 text-xs text-slate-500">
-                                {dateText(
-                                  competition.competition_date
-                                )}
-                              </p>
+                                  <p className="mt-2 text-sm text-slate-600">
+                                    {round.name}
+                                    {" · "}
+                                    {competition.organization_code}
+                                  </p>
+
+                                  <p className="mt-1 text-xs text-slate-500">
+                                    {dateText(
+                                      competition.competition_date
+                                    )}
+                                  </p>
+                                </div>
+                              </div>
                             </td>
 
                             <td className="px-5 py-5 text-slate-700">
@@ -544,9 +527,7 @@ export default async function BandCompetitionHistory({
                             </td>
 
                             <td className="px-5 py-5 text-right font-bold tabular-nums text-[#002144]">
-                              {scoreText(
-                                entry.total_score
-                              )}
+                              {scoreText(entry.total_score)}
                             </td>
                           </tr>
                         );
@@ -557,18 +538,17 @@ export default async function BandCompetitionHistory({
               </section>
             ))}
 
-            {/* Footnote and archive navigation */}
             <div className="flex flex-wrap items-center justify-between gap-5 border-t border-slate-200 pt-7">
               <p className="max-w-2xl text-xs leading-6 text-slate-500">
                 (T) indicates a shared recorded placement.
-                Historical scoring systems may differ
-                between organizations and seasons.
-                Missing values are shown as —.
+                Historical scoring systems can differ between
+                organizations and seasons. Missing values
+                are shown as —.
               </p>
 
               <Link
                 href="/competitions"
-                className="inline-flex cursor-pointer items-center gap-2 rounded-lg bg-[#002144] px-5 py-3 text-sm font-bold text-white transition hover:bg-[#123B63]"
+                className="inline-flex cursor-pointer items-center gap-2 rounded-lg bg-[#002144] px-5 py-3 text-sm font-bold text-white hover:bg-[#123B63]"
               >
                 Browse Competitions
                 <span aria-hidden="true">&rarr;</span>

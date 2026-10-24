@@ -3,15 +3,25 @@ import { Suspense } from "react";
 import Link from "next/link";
 
 import { createClient } from "@/lib/supabase/server";
-import {
-  competitionPublicUrl,
-} from "@/lib/public-competition-routes";
+import { competitionPublicUrl } from "@/lib/public-competition-routes";
+import OrganizationMark from "@/components/OrganizationMark";
 
 export const instant = false;
 
 const PAGE_SIZE = 20;
 
 const ORGANIZATIONS = ["KMEA", "MSBA", "BOA", "DCI"];
+
+const COMPETITION_TYPES = [
+  "regular_season",
+  "smbc",
+  "championships",
+  "regional",
+  "super_regional",
+  "grand_nationals",
+  "regular_competition",
+  "world_championship",
+];
 
 type Props = {
   searchParams: Promise<{
@@ -28,9 +38,7 @@ function label(value: string | null): string {
 
   return value
     .replaceAll("_", " ")
-    .replace(/\b\w/g, (letter) =>
-      letter.toUpperCase()
-    );
+    .replace(/\b\w/g, (letter) => letter.toUpperCase());
 }
 
 function dateLabel(value: string | null): string {
@@ -49,7 +57,7 @@ function dateLabel(value: string | null): string {
 function pageUrl(
   filters: Record<string, string>,
   page: number
-) {
+): string {
   const params = new URLSearchParams();
 
   for (const [key, value] of Object.entries(filters)) {
@@ -57,12 +65,11 @@ function pageUrl(
   }
 
   params.set("page", String(page));
+
   return `/competitions?${params.toString()}`;
 }
 
-async function Directory({
-  searchParams,
-}: Props) {
+async function Directory({ searchParams }: Props) {
   const params = await searchParams;
 
   const q = (params.q ?? "").trim().slice(0, 100);
@@ -80,13 +87,13 @@ async function Directory({
       ? params.year!
       : "";
 
-  const type =
-    /^[a-z_]+$/.test(params.type ?? "") &&
-    (params.type ?? "").length <= 50
-      ? params.type!
-      : "";
+  const type = COMPETITION_TYPES.includes(
+    params.type ?? ""
+  )
+    ? params.type!
+    : "";
 
-  const requestedPage = Number(params.page ?? 1);
+  const requestedPage = Number(params.page ?? "1");
 
   const page =
     Number.isSafeInteger(requestedPage) &&
@@ -120,10 +127,7 @@ async function Directory({
   }
 
   if (organization) {
-    query = query.eq(
-      "organization_code",
-      organization
-    );
+    query = query.eq("organization_code", organization);
   }
 
   if (year) {
@@ -143,7 +147,6 @@ async function Directory({
 
   const total = count ?? 0;
   const pages = Math.ceil(total / PAGE_SIZE);
-
   const filters = { q, organization, year, type };
 
   return (
@@ -159,6 +162,7 @@ async function Directory({
         <div className="mt-5 grid gap-4 md:grid-cols-2 lg:grid-cols-4">
           <label className="text-sm font-semibold text-[#002144] lg:col-span-2">
             Competition Name
+
             <input
               name="q"
               type="search"
@@ -171,12 +175,14 @@ async function Directory({
 
           <label className="text-sm font-semibold text-[#002144]">
             Organization
+
             <select
               name="organization"
               defaultValue={organization}
               className="mt-2 w-full rounded-lg border border-slate-300 bg-white px-4 py-3"
             >
               <option value="">All Organizations</option>
+
               {ORGANIZATIONS.map((org) => (
                 <option key={org} value={org}>
                   {org}
@@ -187,6 +193,7 @@ async function Directory({
 
           <label className="text-sm font-semibold text-[#002144]">
             Season
+
             <input
               name="year"
               type="number"
@@ -200,22 +207,15 @@ async function Directory({
 
           <label className="text-sm font-semibold text-[#002144] lg:col-span-2">
             Competition Type
+
             <select
               name="type"
               defaultValue={type}
               className="mt-2 w-full rounded-lg border border-slate-300 bg-white px-4 py-3"
             >
               <option value="">All Types</option>
-              {[
-                "regular_season",
-                "smbc",
-                "championships",
-                "regional",
-                "super_regional",
-                "grand_nationals",
-                "regular_competition",
-                "world_championship",
-              ].map((value) => (
+
+              {COMPETITION_TYPES.map((value) => (
                 <option key={value} value={value}>
                   {label(value)}
                 </option>
@@ -226,7 +226,7 @@ async function Directory({
           <div className="flex flex-wrap items-end gap-3 lg:col-span-2">
             <button
               type="submit"
-              className="cursor-pointer rounded-lg bg-[#861F41] px-6 py-3 text-sm font-bold text-white"
+              className="cursor-pointer rounded-lg bg-[#861F41] px-6 py-3 text-sm font-bold text-white hover:bg-[#A02B52]"
             >
               Search Archive
             </button>
@@ -246,62 +246,83 @@ async function Directory({
           <h2 className="font-serif text-3xl font-bold text-[#002144]">
             Published Competitions
           </h2>
+
           {!error && (
             <p className="text-sm text-slate-500">
-              {total.toLocaleString()} records
+              {total.toLocaleString("en-US")} records
             </p>
           )}
         </div>
 
         {error ? (
-          <p role="alert" className="rounded-xl bg-red-50 p-6 text-red-800">
+          <p
+            role="alert"
+            className="rounded-xl border border-red-200 bg-red-50 p-6 text-red-800"
+          >
             Unable to load competitions.
           </p>
         ) : data?.length ? (
           <div className="grid gap-5 md:grid-cols-2">
             {data.map((competition) => (
-              <Link
+              <article
                 key={competition.id}
-                href={competitionPublicUrl(
-                  competition.slug
-                )}
-                className="group flex flex-col justify-between rounded-2xl border border-slate-200 bg-white p-6 shadow-sm transition hover:border-[#861F41] hover:shadow-md"
+                className="flex h-full flex-col rounded-2xl border border-slate-200 bg-white p-6 shadow-sm transition hover:border-[#861F41] hover:shadow-md"
               >
-                <div>
-                  <p className="text-xs font-bold uppercase tracking-widest text-[#861F41]">
-                    {competition.organization_code}
-                    {" · "}
-                    {competition.season_year}
-                  </p>
+                <div className="flex items-start gap-4">
+                  <OrganizationMark
+                    code={competition.organization_code}
+                    size="medium"
+                    linked
+                  />
 
-                  <h3 className="mt-3 font-serif text-2xl font-bold text-[#002144] group-hover:text-[#861F41]">
-                    {competition.name}
-                  </h3>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-xs font-bold uppercase tracking-widest text-[#861F41]">
+                      {competition.organization_code}
+                      {" · "}
+                      {competition.season_year}
+                    </p>
 
-                  <p className="mt-3 text-sm text-slate-600">
-                    {label(competition.competition_type)}
-                  </p>
+                    <h3 className="mt-2 font-serif text-2xl font-bold text-[#002144]">
+                      <Link
+                        href={competitionPublicUrl(
+                          competition.slug
+                        )}
+                        className="hover:text-[#861F41] hover:underline"
+                      >
+                        {competition.name}
+                      </Link>
+                    </h3>
 
-                  <p className="mt-5 text-sm text-slate-600">
-                    {dateLabel(
-                      competition.competition_date
-                    )}
-                  </p>
+                    <p className="mt-3 text-sm text-slate-600">
+                      {label(competition.competition_type)}
+                    </p>
+                  </div>
+                </div>
 
-                  <p className="mt-2 text-sm text-slate-600">
+                <div className="mt-5 space-y-2 text-sm text-slate-600">
+                  <p>{dateLabel(competition.competition_date)}</p>
+
+                  <p>
                     {[
                       competition.city,
                       competition.state,
                       competition.country,
-                    ].filter(Boolean).join(", ") ||
-                      "Location not recorded"}
+                    ]
+                      .filter(Boolean)
+                      .join(", ") || "Location not recorded"}
                   </p>
                 </div>
 
-                <p className="mt-6 border-t border-slate-100 pt-4 text-sm font-bold text-[#861F41]">
-                  View Competition & Results →
-                </p>
-              </Link>
+                <div className="mt-auto border-t border-slate-100 pt-5">
+                  <Link
+                    href={competitionPublicUrl(competition.slug)}
+                    className="inline-flex cursor-pointer items-center gap-2 text-sm font-bold text-[#861F41] hover:underline"
+                  >
+                    View Competition &amp; Results
+                    <span aria-hidden="true">&rarr;</span>
+                  </Link>
+                </div>
+              </article>
             ))}
           </div>
         ) : (
@@ -309,6 +330,7 @@ async function Directory({
             <h3 className="text-xl font-bold text-[#002144]">
               No competitions found
             </h3>
+
             <p className="mt-3 text-sm text-slate-600">
               Adjust your filters or check back as more
               historical records are published.
@@ -327,7 +349,7 @@ async function Directory({
               href={pageUrl(filters, page - 1)}
               className="rounded-lg border border-slate-300 bg-white px-5 py-3 text-sm font-bold text-[#002144]"
             >
-              ← Previous
+              &larr; Previous
             </Link>
           )}
 
@@ -340,7 +362,7 @@ async function Directory({
               href={pageUrl(filters, page + 1)}
               className="rounded-lg border border-slate-300 bg-white px-5 py-3 text-sm font-bold text-[#002144]"
             >
-              Next →
+              Next &rarr;
             </Link>
           )}
         </nav>
@@ -354,7 +376,7 @@ export default function CompetitionsPage(props: Props) {
     <main className="min-h-screen bg-[#F4F6F9]">
       <section className="bg-[#002144] px-6 py-16 text-white">
         <div className="mx-auto max-w-7xl">
-          <p className="text-xs font-bold uppercase tracking-widest text-[#E0B4C2]">
+          <p className="text-xs font-bold uppercase tracking-[0.25em] text-[#E0B4C2]">
             The Marching Archives
           </p>
 
@@ -363,8 +385,8 @@ export default function CompetitionsPage(props: Props) {
           </h1>
 
           <p className="mt-5 max-w-2xl text-lg leading-8 text-slate-300">
-            Explore published marching band and drum
-            corps competitions, placements, and scores.
+            Explore published marching band and drum corps
+            competitions, placements, and scores.
           </p>
         </div>
       </section>
