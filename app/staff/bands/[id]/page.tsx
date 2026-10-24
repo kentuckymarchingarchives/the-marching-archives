@@ -4,6 +4,7 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 
 import { createClient } from "@/lib/supabase/server";
+
 import {
   UUID_PATTERN,
   type BandKind,
@@ -42,7 +43,6 @@ async function EditBandContent({
 
   const supabase = await createClient();
 
-  // Verify authentication.
   const { data: auth, error: authError } =
     await supabase.auth.getClaims();
 
@@ -50,7 +50,6 @@ async function EditBandContent({
     redirect("/staff/login");
   }
 
-  // Verify active staff membership.
   const { data: staff, error: staffError } =
     await supabase
       .from("staff_members")
@@ -69,12 +68,11 @@ async function EditBandContent({
     redirect("/staff/login?error=unauthorized");
   }
 
-  // Load the band.
   const { data: band, error: bandError } =
     await supabase
       .from("bands")
       .select(
-        "id, slug, name, kind, city, state, country, notes"
+        "id, slug, name, kind, city, state, country, notes, competitive_status"
       )
       .eq("id", id)
       .maybeSingle();
@@ -87,7 +85,6 @@ async function EditBandContent({
     notFound();
   }
 
-  // Load historical names.
   const { data: names, error: namesError } =
     await supabase
       .from("band_names")
@@ -286,7 +283,6 @@ async function EditBandContent({
   );
 }
 
-// Static page shell with a Suspense boundary.
 export default function EditBandPage(props: Props) {
   return (
     <main className="min-h-screen bg-[#F4F6F9]">
