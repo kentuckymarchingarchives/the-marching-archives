@@ -1,86 +1,98 @@
 
 import { Suspense } from "react";
 import Link from "next/link";
+
 import { createClient } from "@/lib/supabase/server";
+import {
+  competitionPublicUrl,
+} from "@/lib/public-competition-routes";
 
 export const instant = false;
 
 const PAGE_SIZE = 20;
 
-type SearchFilters = {
-  q?: string;
-  organization?: string;
-  year?: string;
-  page?: string;
-};
+const ORGANIZATIONS = ["KMEA", "MSBA", "BOA", "DCI"];
 
 type Props = {
-  searchParams: Promise<SearchFilters>;
+  searchParams: Promise<{
+    q?: string;
+    organization?: string;
+    year?: string;
+    type?: string;
+    page?: string;
+  }>;
 };
 
-const organizations = ["KMEA", "MSBA", "BOA", "DCI"];
+function label(value: string | null): string {
+  if (!value) return "Not specified";
 
-function formatDate(value: string | null): string {
+  return value
+    .replaceAll("_", " ")
+    .replace(/\b\w/g, (letter) =>
+      letter.toUpperCase()
+    );
+}
+
+function dateLabel(value: string | null): string {
   if (!value) return "Date not recorded";
 
   const date = new Date(`${value}T12:00:00Z`);
 
-  if (Number.isNaN(date.getTime())) {
-    return "Date not recorded";
-  }
-
-  return date.toLocaleDateString("en-US", {
-    month: "long",
-    day: "numeric",
-    year: "numeric",
-    timeZone: "UTC",
-  });
+  return Number.isNaN(date.getTime())
+    ? "Date not recorded"
+    : date.toLocaleDateString("en-US", {
+        dateStyle: "medium",
+        timeZone: "UTC",
+      });
 }
 
-function pageLink(
-  q: string,
-  organization: string,
-  year: string,
+function pageUrl(
+  filters: Record<string, string>,
   page: number
-): string {
+) {
   const params = new URLSearchParams();
 
-  if (q) params.set("q", q);
-  if (organization) {
-    params.set("organization", organization);
+  for (const [key, value] of Object.entries(filters)) {
+    if (value) params.set(key, value);
   }
-  if (year) params.set("year", year);
 
   params.set("page", String(page));
-
   return `/competitions?${params.toString()}`;
 }
 
-async function DirectoryContent({ searchParams }: Props) {
-  const filters = await searchParams;
+async function Directory({
+  searchParams,
+}: Props) {
+  const params = await searchParams;
 
-  const q = (filters.q ?? "").trim().slice(0, 100);
+  const q = (params.q ?? "").trim().slice(0, 100);
 
-  const organization = organizations.includes(
-    filters.organization ?? ""
+  const organization = ORGANIZATIONS.includes(
+    params.organization ?? ""
   )
-    ? filters.organization!
+    ? params.organization!
     : "";
 
   const year =
-    /^\d{4}$/.test(filters.year ?? "") &&
-    Number(filters.year) >= 1800 &&
-    Number(filters.year) <= 2200
-      ? filters.year!
+    /^\d{4}$/.test(params.year ?? "") &&
+    Number(params.year) >= 1800 &&
+    Number(params.year) <= 2200
+      ? params.year!
       : "";
 
-  const parsedPage = Number(filters.page ?? "1");
+  const type =
+    /^[a-z_]+$/.test(params.type ?? "") &&
+    (params.type ?? "").length <= 50
+      ? params.type!
+      : "";
+
+  const requestedPage = Number(params.page ?? 1);
 
   const page =
-    Number.isSafeInteger(parsedPage) &&
-    parsedPage >= 1 &&
-    parsedPage <= 10000
-      ? parsedPage
+    Number.isSafeInteger(requestedPage) &&
+    requestedPage >= 1 &&
+    requestedPage <= 10000
+      ? requestedPage
       : 1;
 
   const supabase = await createClient();
@@ -88,7 +100,7 @@ async function DirectoryContent({ searchParams }: Props) {
   let query = supabase
     .from("competitions")
     .select(
-      "id, name, season_year, organization_code, competition_type, competition_date, city, state, country",
+      "id, slug, name, season_year, organization_code, competition_type, competition_date, city, state, country",
       { count: "exact" }
     )
     .eq("publication_status", "published")
@@ -118,36 +130,41 @@ async function DirectoryContent({ searchParams }: Props) {
     query = query.eq("season_year", Number(year));
   }
 
-  const offset = (page - 1) * PAGE_SIZE;
+  if (type) {
+    query = query.eq("competition_type", type);
+  }
 
-  const { data, error, count } = await query.range(
-    offset,
-    offset + PAGE_SIZE - 1
+  const from = (page - 1) * PAGE_SIZE;
+
+  const { data, count, error } = await query.range(
+    from,
+    from + PAGE_SIZE - 1
   );
 
-  const competitions = data ?? [];
   const total = count ?? 0;
-  const totalPages = Math.ceil(total / PAGE_SIZE);
+  const pages = Math.ceil(total / PAGE_SIZE);
+
+  const filters = { q, organization, year, type };
 
   return (
-    <div className="mx-auto max-w-7xl space-y-8 px-6 py-12">
+    <div className="mx-auto max-w-7xl space-y-9 px-6 py-12">
       <form
         method="get"
         className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm"
       >
         <h2 className="text-xl font-bold text-[#002144]">
-          Search Competitions
+          Search Historical Competitions
         </h2>
 
-        <div className="mt-5 grid gap-4 md:grid-cols-3">
-          <label className="text-sm font-semibold text-[#002144]">
+        <div className="mt-5 grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+          <label className="text-sm font-semibold text-[#002144] lg:col-span-2">
             Competition Name
             <input
               name="q"
               type="search"
               maxLength={100}
               defaultValue={q}
-              placeholder="Search by event name"
+              placeholder="Search competition names"
               className="mt-2 w-full rounded-lg border border-slate-300 px-4 py-3"
             />
           </label>
@@ -160,7 +177,7 @@ async function DirectoryContent({ searchParams }: Props) {
               className="mt-2 w-full rounded-lg border border-slate-300 bg-white px-4 py-3"
             >
               <option value="">All Organizations</option>
-              {organizations.map((org) => (
+              {ORGANIZATIONS.map((org) => (
                 <option key={org} value={org}>
                   {org}
                 </option>
@@ -176,26 +193,51 @@ async function DirectoryContent({ searchParams }: Props) {
               min={1800}
               max={2200}
               defaultValue={year}
-              placeholder="All seasons"
+              placeholder="All Seasons"
               className="mt-2 w-full rounded-lg border border-slate-300 px-4 py-3"
             />
           </label>
-        </div>
 
-        <div className="mt-5 flex flex-wrap gap-3">
-          <button
-            type="submit"
-            className="cursor-pointer rounded-lg bg-[#861F41] px-6 py-3 text-sm font-bold text-white hover:bg-[#A02B52]"
-          >
-            Search Archive
-          </button>
+          <label className="text-sm font-semibold text-[#002144] lg:col-span-2">
+            Competition Type
+            <select
+              name="type"
+              defaultValue={type}
+              className="mt-2 w-full rounded-lg border border-slate-300 bg-white px-4 py-3"
+            >
+              <option value="">All Types</option>
+              {[
+                "regular_season",
+                "smbc",
+                "championships",
+                "regional",
+                "super_regional",
+                "grand_nationals",
+                "regular_competition",
+                "world_championship",
+              ].map((value) => (
+                <option key={value} value={value}>
+                  {label(value)}
+                </option>
+              ))}
+            </select>
+          </label>
 
-          <Link
-            href="/competitions"
-            className="rounded-lg border border-slate-300 px-6 py-3 text-sm font-bold text-[#002144] hover:bg-slate-50"
-          >
-            Clear Filters
-          </Link>
+          <div className="flex flex-wrap items-end gap-3 lg:col-span-2">
+            <button
+              type="submit"
+              className="cursor-pointer rounded-lg bg-[#861F41] px-6 py-3 text-sm font-bold text-white"
+            >
+              Search Archive
+            </button>
+
+            <Link
+              href="/competitions"
+              className="rounded-lg border border-slate-300 px-6 py-3 text-sm font-bold text-[#002144]"
+            >
+              Clear Filters
+            </Link>
+          </div>
         </div>
       </form>
 
@@ -204,39 +246,26 @@ async function DirectoryContent({ searchParams }: Props) {
           <h2 className="font-serif text-3xl font-bold text-[#002144]">
             Published Competitions
           </h2>
-
           {!error && (
             <p className="text-sm text-slate-500">
-              {total.toLocaleString("en-US")} records
+              {total.toLocaleString()} records
             </p>
           )}
         </div>
 
         {error ? (
-          <div
-            role="alert"
-            className="rounded-xl border border-red-200 bg-red-50 p-6 text-red-800"
-          >
-            Unable to load competition records.
-          </div>
-        ) : competitions.length === 0 ? (
-          <div className="rounded-2xl border border-slate-200 bg-white p-10 text-center">
-            <h3 className="text-xl font-bold text-[#002144]">
-              No competitions found
-            </h3>
-
-            <p className="mt-3 text-sm text-slate-600">
-              Try adjusting your filters, or check back
-              as more verified historical results are published.
-            </p>
-          </div>
-        ) : (
+          <p role="alert" className="rounded-xl bg-red-50 p-6 text-red-800">
+            Unable to load competitions.
+          </p>
+        ) : data?.length ? (
           <div className="grid gap-5 md:grid-cols-2">
-            {competitions.map((competition) => (
+            {data.map((competition) => (
               <Link
                 key={competition.id}
-                href={`/competitions/${competition.id}`}
-                className="group flex h-full flex-col justify-between rounded-2xl border border-slate-200 bg-white p-6 shadow-sm transition hover:border-[#861F41] hover:shadow-md"
+                href={competitionPublicUrl(
+                  competition.slug
+                )}
+                className="group flex flex-col justify-between rounded-2xl border border-slate-200 bg-white p-6 shadow-sm transition hover:border-[#861F41] hover:shadow-md"
               >
                 <div>
                   <p className="text-xs font-bold uppercase tracking-widest text-[#861F41]">
@@ -250,33 +279,23 @@ async function DirectoryContent({ searchParams }: Props) {
                   </h3>
 
                   <p className="mt-3 text-sm text-slate-600">
-                    {competition.competition_type
-                      .replaceAll("_", " ")
-                      .replace(/\b\w/g, (letter: string) =>
-                        letter.toUpperCase()
-                      )}
+                    {label(competition.competition_type)}
                   </p>
 
-                  <div className="mt-5 space-y-2 text-sm text-slate-600">
-                    <p>
-                      <strong>Date:</strong>{" "}
-                      {formatDate(
-                        competition.competition_date
-                      )}
-                    </p>
+                  <p className="mt-5 text-sm text-slate-600">
+                    {dateLabel(
+                      competition.competition_date
+                    )}
+                  </p>
 
-                    <p>
-                      <strong>Location:</strong>{" "}
-                      {[
-                        competition.city,
-                        competition.state,
-                        competition.country,
-                      ]
-                        .filter(Boolean)
-                        .join(", ") ||
-                        "Not recorded"}
-                    </p>
-                  </div>
+                  <p className="mt-2 text-sm text-slate-600">
+                    {[
+                      competition.city,
+                      competition.state,
+                      competition.country,
+                    ].filter(Boolean).join(", ") ||
+                      "Location not recorded"}
+                  </p>
                 </div>
 
                 <p className="mt-6 border-t border-slate-100 pt-4 text-sm font-bold text-[#861F41]">
@@ -285,22 +304,27 @@ async function DirectoryContent({ searchParams }: Props) {
               </Link>
             ))}
           </div>
+        ) : (
+          <div className="rounded-2xl border border-slate-200 bg-white p-10 text-center">
+            <h3 className="text-xl font-bold text-[#002144]">
+              No competitions found
+            </h3>
+            <p className="mt-3 text-sm text-slate-600">
+              Adjust your filters or check back as more
+              historical records are published.
+            </p>
+          </div>
         )}
       </section>
 
-      {!error && totalPages > 1 && (
+      {!error && pages > 1 && (
         <nav
           aria-label="Competition pages"
-          className="flex flex-wrap items-center justify-center gap-4 border-t border-slate-200 pt-7"
+          className="flex flex-wrap items-center justify-center gap-5 border-t border-slate-200 pt-8"
         >
           {page > 1 && (
             <Link
-              href={pageLink(
-                q,
-                organization,
-                year,
-                page - 1
-              )}
+              href={pageUrl(filters, page - 1)}
               className="rounded-lg border border-slate-300 bg-white px-5 py-3 text-sm font-bold text-[#002144]"
             >
               ← Previous
@@ -308,17 +332,12 @@ async function DirectoryContent({ searchParams }: Props) {
           )}
 
           <span className="text-sm font-semibold text-[#002144]">
-            Page {page} of {totalPages}
+            Page {page} of {pages}
           </span>
 
-          {page < totalPages && (
+          {page < pages && (
             <Link
-              href={pageLink(
-                q,
-                organization,
-                year,
-                page + 1
-              )}
+              href={pageUrl(filters, page + 1)}
               className="rounded-lg border border-slate-300 bg-white px-5 py-3 text-sm font-bold text-[#002144]"
             >
               Next →
@@ -344,23 +363,20 @@ export default function CompetitionsPage(props: Props) {
           </h1>
 
           <p className="mt-5 max-w-2xl text-lg leading-8 text-slate-300">
-            Explore published historical competitions,
-            championship events, placements, and results.
+            Explore published marching band and drum
+            corps competitions, placements, and scores.
           </p>
         </div>
       </section>
 
       <Suspense
         fallback={
-          <div
-            role="status"
-            className="mx-auto max-w-7xl px-6 py-12 text-sm text-slate-600"
-          >
-            Loading competition archive...
+          <div className="mx-auto max-w-7xl px-6 py-12 text-sm text-slate-600">
+            Loading competitions...
           </div>
         }
       >
-        <DirectoryContent searchParams={props.searchParams} />
+        <Directory searchParams={props.searchParams} />
       </Suspense>
     </main>
   );

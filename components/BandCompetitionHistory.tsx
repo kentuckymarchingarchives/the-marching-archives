@@ -3,6 +3,9 @@ import Link from "next/link";
 
 import { createClient } from "@/lib/supabase/server";
 import { UUID_PATTERN } from "@/lib/band-validation";
+import {
+  roundPublicUrl,
+} from "@/lib/public-competition-routes";
 
 type Props = {
   bandIdentifier: string;
@@ -19,12 +22,14 @@ type Entry = {
 
 type Round = {
   id: string;
+  slug: string;
   competition_id: string;
   name: string;
 };
 
 type Competition = {
   id: string;
+  slug: string;
   name: string;
   season_year: number;
   organization_code: string;
@@ -37,18 +42,14 @@ type Appearance = {
   competition: Competition;
 };
 
-function displayScore(
+function scoreText(
   value: number | string | null
-): string {
-  if (value === null || value === undefined) {
-    return "—";
-  }
+) {
+  if (value === null) return "—";
 
   const number = Number(value);
 
-  if (!Number.isFinite(number)) {
-    return "—";
-  }
+  if (!Number.isFinite(number)) return "—";
 
   return number
     .toFixed(4)
@@ -56,78 +57,25 @@ function displayScore(
     .replace(/\.$/, "");
 }
 
-function displayPlacement(
+function rankText(
   value: number | null,
-  tied: boolean
-): string {
+  isTie: boolean
+) {
   if (value === null) return "—";
-
-  return `${value}${tied ? " (T)" : ""}`;
+  return `${value}${isTie ? " (T)" : ""}`;
 }
 
-function displayDate(
-  value: string | null
-): string {
+function dateText(value: string | null) {
   if (!value) return "Date not recorded";
 
   const date = new Date(`${value}T12:00:00Z`);
 
-  if (Number.isNaN(date.getTime())) {
-    return "Date not recorded";
-  }
-
-  return date.toLocaleDateString("en-US", {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-    timeZone: "UTC",
-  });
-}
-
-function organizeHistory(
-  appearances: Appearance[]
-): Map<number, Appearance[]> {
-  const bySeason = new Map<number, Appearance[]>();
-
-  for (const appearance of appearances) {
-    const year = appearance.competition.season_year;
-    const existing = bySeason.get(year) ?? [];
-
-    existing.push(appearance);
-    bySeason.set(year, existing);
-  }
-
-  return new Map(
-    [...bySeason.entries()]
-      .sort(([a], [b]) => b - a)
-      .map(([year, events]) => [
-        year,
-        events.sort((a, b) => {
-          const dateComparison = (
-            b.competition.competition_date ?? ""
-          ).localeCompare(
-            a.competition.competition_date ?? ""
-          );
-
-          if (dateComparison !== 0) {
-            return dateComparison;
-          }
-
-          const nameComparison =
-            a.competition.name.localeCompare(
-              b.competition.name
-            );
-
-          if (nameComparison !== 0) {
-            return nameComparison;
-          }
-
-          return a.round.name.localeCompare(
-            b.round.name
-          );
-        }),
-      ])
-  );
+  return Number.isNaN(date.getTime())
+    ? "Date not recorded"
+    : date.toLocaleDateString("en-US", {
+        dateStyle: "medium",
+        timeZone: "UTC",
+      });
 }
 
 export default async function BandCompetitionHistory({
@@ -135,125 +83,88 @@ export default async function BandCompetitionHistory({
 }: Props) {
   const supabase = await createClient();
 
-  const isUuid = UUID_PATTERN.test(bandIdentifier);
-
-  // Public profiles normally use band slugs.
-  // UUID lookup also supports legacy band URLs.
   const { data: band, error: bandError } =
     await supabase
       .from("bands")
-      .select("id, name, slug")
+      .select("id, name")
       .eq(
-        isUuid ? "id" : "slug",
+        UUID_PATTERN.test(bandIdentifier)
+          ? "id"
+          : "slug",
         bandIdentifier
       )
       .is("archived_at", null)
       .maybeSingle();
 
-  if (bandError || !band) {
-    return null;
-  }
+  if (bandError || !band) return null;
 
-  const { data: entryData, count: entryCount, error: entryError } =
-    await supabase
-      .from("competition_entries")
-      .select(
-        "id, round_id, classification, total_score, class_placement, overall_placement",
-        { count: "exact" }
-      )
-      .eq("band_id", band.id)
-      .limit(1000);
+  const { data, count, error } = await supabase
+    .from("competition_entries")
+    .select(
+      "id, round_id, classification, total_score, class_placement, overall_placement",
+      { count: "exact" }
+    )
+    .eq("band_id", band.id)
+    .limit(1000);
 
-  if (entryError) {
+  if (error) {
     return (
       <section className="mx-auto max-w-6xl px-6 py-10">
-        <div className="rounded-xl border border-red-200 bg-red-50 p-6 text-sm text-red-800">
+        <p role="alert" className="rounded-xl bg-red-50 p-6 text-red-800">
           Competition history is temporarily unavailable.
-        </div>
+        </p>
       </section>
     );
   }
 
-  const entries = (entryData ?? []) as Entry[];
+  const entries = (data ?? []) as Entry[];
 
-  if (entries.length === 0) {
-    return (
-      <section
-        id="competition-history"
-        className="mx-auto max-w-6xl px-6 py-12"
-      >
-        <div className="rounded-2xl border border-slate-200 bg-white p-8">
-          <p className="text-xs font-bold uppercase tracking-widest text-[#861F41]">
-            Historical Records
-          </p>
+  const roundIds = [...new Set(
+    entries.map((entry) => entry.round_id)
+  )];
 
-          <h2 className="mt-3 font-serif text-3xl font-bold text-[#002144]">
-            Competition History
-          </h2>
+  let rounds: Round[] = [];
 
-          <p className="mt-4 text-sm leading-7 text-slate-600">
-            No published competition appearances are
-            currently available for this ensemble.
-            Historical records will appear here
-            as they are verified and published.
-          </p>
-
-          <Link
-            href="/competitions"
-            className="mt-5 inline-block text-sm font-bold text-[#861F41] hover:underline"
-          >
-            Browse Competition Archive →
-          </Link>
-        </div>
-      </section>
-    );
-  }
-
-  const roundIds = [
-    ...new Set(entries.map((entry) => entry.round_id)),
-  ];
-
-  // Explicitly exclude archived rounds, including
-  // when this page is viewed by a signed-in staff member.
-  const { data: roundData, error: roundError } =
-    await supabase
+  if (roundIds.length > 0) {
+    const result = await supabase
       .from("competition_rounds")
-      .select("id, competition_id, name")
+      .select("id, slug, competition_id, name")
       .in("id", roundIds)
       .is("archived_at", null);
 
-  if (roundError) {
-    throw new Error("Unable to load band competition rounds.");
+    if (result.error) {
+      throw new Error(
+        "Unable to load historical rounds."
+      );
+    }
+
+    rounds = (result.data ?? []) as Round[];
   }
 
-  const rounds = (roundData ?? []) as Round[];
-
-  const competitionIds = [
-    ...new Set(
-      rounds.map((round) => round.competition_id)
-    ),
-  ];
+  const competitionIds = [...new Set(
+    rounds.map((round) => round.competition_id)
+  )];
 
   let competitions: Competition[] = [];
 
   if (competitionIds.length > 0) {
-    // This filter applies even for logged-in staff.
-    const { data, error } = await supabase
+    const result = await supabase
       .from("competitions")
       .select(
-        "id, name, season_year, organization_code, competition_date"
+        "id, slug, name, season_year, organization_code, competition_date"
       )
       .in("id", competitionIds)
       .eq("publication_status", "published")
       .is("archived_at", null);
 
-    if (error) {
+    if (result.error) {
       throw new Error(
-        "Unable to load published competition history."
+        "Unable to load published history."
       );
     }
 
-    competitions = (data ?? []) as Competition[];
+    competitions =
+      (result.data ?? []) as Competition[];
   }
 
   const roundMap = new Map(
@@ -287,77 +198,95 @@ export default async function BandCompetitionHistory({
     });
   }
 
-  const history = organizeHistory(appearances);
+  appearances.sort((a, b) => {
+    const yearDifference =
+      b.competition.season_year -
+      a.competition.season_year;
 
-  // A tie is determined from a shared recorded rank
-  // within the same round, not from matching scores.
-  //
-  // To identify ties properly, read the public entries
-  // for each round represented in this band's history.
-  const publishedRoundIds = [
-    ...new Set(appearances.map((item) => item.round.id)),
-  ];
+    if (yearDifference) return yearDifference;
+
+    const dateDifference =
+      (b.competition.competition_date ?? "")
+        .localeCompare(
+          a.competition.competition_date ?? ""
+        );
+
+    if (dateDifference) return dateDifference;
+
+    const nameDifference =
+      a.competition.name.localeCompare(
+        b.competition.name
+      );
+
+    if (nameDifference) return nameDifference;
+
+    return a.round.name.localeCompare(b.round.name);
+  });
+
+  const grouped = new Map<number, Appearance[]>();
+
+  for (const item of appearances) {
+    const year = item.competition.season_year;
+
+    grouped.set(
+      year,
+      [...(grouped.get(year) ?? []), item]
+    );
+  }
+
+  // Check ties against the other public entries
+  // in each round, not merely identical total scores.
+  const publicRoundIds = [...new Set(
+    appearances.map((item) => item.round.id)
+  )];
 
   const tieKeys = new Set<string>();
   let tieCheckComplete = true;
 
-  if (publishedRoundIds.length > 0) {
-    const { data: placementData, count, error } =
-      await supabase
-        .from("competition_entries")
-        .select(
-          "round_id, classification, class_placement, overall_placement",
-          { count: "exact" }
-        )
-        .in("round_id", publishedRoundIds)
-        .limit(5000);
+  if (publicRoundIds.length > 0) {
+    const result = await supabase
+      .from("competition_entries")
+      .select(
+        "round_id, classification, class_placement, overall_placement",
+        { count: "exact" }
+      )
+      .in("round_id", publicRoundIds)
+      .limit(5000);
 
-    if (error) {
+    if (
+      result.error ||
+      (result.count ?? 0) > (result.data?.length ?? 0)
+    ) {
       tieCheckComplete = false;
     } else {
-      const records = placementData ?? [];
+      const counts = new Map<string, number>();
 
-      if ((count ?? 0) > records.length) {
-        tieCheckComplete = false;
-      } else {
-        const rankCounts = new Map<string, number>();
+      for (const row of result.data ?? []) {
+        if (row.overall_placement !== null) {
+          const key =
+            `overall:${row.round_id}:${row.overall_placement}`;
 
-        for (const record of records) {
-          if (record.overall_placement !== null) {
-            const key =
-              `overall:${record.round_id}:${record.overall_placement}`;
-
-            rankCounts.set(
-              key,
-              (rankCounts.get(key) ?? 0) + 1
-            );
-          }
-
-          if (
-            record.classification !== null &&
-            record.class_placement !== null
-          ) {
-            const key =
-              `class:${record.round_id}:${record.classification}:${record.class_placement}`;
-
-            rankCounts.set(
-              key,
-              (rankCounts.get(key) ?? 0) + 1
-            );
-          }
+          counts.set(key, (counts.get(key) ?? 0) + 1);
         }
 
-        for (const [key, countValue] of rankCounts) {
-          if (countValue > 1) {
-            tieKeys.add(key);
-          }
+        if (
+          row.classification !== null &&
+          row.class_placement !== null
+        ) {
+          const key =
+            `class:${row.round_id}:${row.classification}:${row.class_placement}`;
+
+          counts.set(key, (counts.get(key) ?? 0) + 1);
         }
+      }
+
+      for (const [key, amount] of counts) {
+        if (amount > 1) tieKeys.add(key);
       }
     }
   }
 
-  const incomplete =
-    (entryCount ?? 0) > entries.length;
+  const incomplete = (count ?? 0) > entries.length;
 
   return (
     <section
@@ -374,11 +303,9 @@ export default async function BandCompetitionHistory({
             Competition History
           </h2>
 
-          <p className="mt-3 max-w-2xl text-sm leading-7 text-slate-600">
-            Published competition appearances for{" "}
-            {band.name}, organized by season.
-            Classifications and placements reflect
-            the individual historical records.
+          <p className="mt-3 text-sm leading-7 text-slate-600">
+            Published appearances for {band.name},
+            organized by season.
           </p>
         </div>
 
@@ -391,68 +318,61 @@ export default async function BandCompetitionHistory({
       </div>
 
       {(incomplete || !tieCheckComplete) && (
-        <div
+        <p
           role="status"
           className="rounded-xl border border-amber-200 bg-amber-50 p-5 text-sm text-amber-900"
         >
           {incomplete
-            ? "Additional historical appearances may exist beyond the current display limit."
-            : "Some tie information could not be verified. Placement numbers are shown without inferred tie markers."}
-        </div>
+            ? "Additional historical entries may exist beyond the display limit."
+            : "Tie markers could not be verified for every entry."}
+        </p>
       )}
 
       {appearances.length === 0 && (
-        <div className="rounded-2xl border border-slate-200 bg-white p-8 text-sm text-slate-600">
-          This band has no publicly available
-          competition appearances yet.
+        <div className="rounded-2xl border border-slate-200 bg-white p-8">
+          <p className="text-sm leading-7 text-slate-600">
+            No published competition appearances are
+            currently available for this ensemble.
+          </p>
+
+          <Link
+            href="/competitions"
+            className="mt-4 inline-block text-sm font-bold text-[#861F41]"
+          >
+            Browse Competitions →
+          </Link>
         </div>
       )}
 
-      {[...history.entries()].map(([year, events]) => (
-        <section
-          key={year}
-          className="space-y-4"
-        >
-          <div className="flex items-center justify-between gap-4">
+      {[...grouped.entries()].map(([year, items]) => (
+        <section key={year} className="space-y-4">
+          <div className="flex items-center justify-between">
             <h3 className="text-2xl font-bold text-[#002144]">
               {year} Season
             </h3>
-
             <span className="text-sm text-slate-500">
-              {events.length}{" "}
-              {events.length === 1
-                ? "appearance"
-                : "appearances"}
+              {items.length} appearances
             </span>
           </div>
 
           <div className="overflow-x-auto rounded-2xl border border-slate-200 bg-white shadow-sm">
-            <table className="w-full min-w-[850px] text-left text-sm">
+            <table className="w-full min-w-[750px] text-left text-sm">
               <thead className="bg-[#002144] text-white">
                 <tr>
-                  <th scope="col" className="px-5 py-4">
+                  <th className="px-5 py-4">
                     Competition / Round
                   </th>
-                  <th scope="col" className="px-5 py-4">
-                    Class
-                  </th>
-                  <th scope="col" className="px-5 py-4">
-                    Class Place
-                  </th>
-                  <th scope="col" className="px-5 py-4">
-                    Overall
-                  </th>
-                  <th
-                    scope="col"
-                    className="px-5 py-4 text-right"
-                  >
+                  <th className="px-5 py-4">Class</th>
+                  <th className="px-5 py-4">Class Place</th>
+                  <th className="px-5 py-4">Overall</th>
+                  <th className="px-5 py-4 text-right">
                     Score
                   </th>
                 </tr>
               </thead>
 
               <tbody className="divide-y divide-slate-100">
-                {events.map((item) => {
+                {items.map((item) => {
                   const { entry, round, competition } =
                     item;
 
@@ -472,13 +392,13 @@ export default async function BandCompetitionHistory({
                     );
 
                   return (
-                    <tr
-                      key={entry.id}
-                      className="hover:bg-slate-50"
-                    >
+                    <tr key={entry.id}>
                       <td className="px-5 py-4">
                         <Link
-                          href={`/competitions/${competition.id}/rounds/${round.id}`}
+                          href={roundPublicUrl(
+                            competition.slug,
+                            round.slug
+                          )}
                           className="font-bold text-[#002144] hover:text-[#861F41] hover:underline"
                         >
                           {competition.name}
@@ -491,34 +411,32 @@ export default async function BandCompetitionHistory({
                         </p>
 
                         <p className="mt-1 text-xs text-slate-500">
-                          {displayDate(
+                          {dateText(
                             competition.competition_date
                           )}
                         </p>
                       </td>
 
-                      <td className="px-5 py-4 text-slate-600">
+                      <td className="px-5 py-4">
                         {entry.classification ?? "—"}
                       </td>
 
-                      <td className="px-5 py-4 font-semibold text-[#002144]">
-                        {displayPlacement(
+                      <td className="px-5 py-4 font-semibold">
+                        {rankText(
                           entry.class_placement,
                           classTie
                         )}
                       </td>
 
-                      <td className="px-5 py-4 font-semibold text-[#002144]">
-                        {displayPlacement(
+                      <td className="px-5 py-4 font-semibold">
+                        {rankText(
                           entry.overall_placement,
                           overallTie
                         )}
                       </td>
 
                       <td className="px-5 py-4 text-right font-bold tabular-nums text-[#002144]">
-                        {displayScore(
-                          entry.total_score
-                        )}
+                        {scoreText(entry.total_score)}
                       </td>
                     </tr>
                   );
@@ -531,20 +449,17 @@ export default async function BandCompetitionHistory({
 
       <p className="text-xs leading-6 text-slate-500">
         (T) indicates a shared recorded placement.
-        Scores from different competitions may use
-        different scoring systems and should not
-        necessarily be compared directly.
-        Missing information is displayed as —.
+        Different historical scoring systems may
+        not be directly comparable. Missing values
+        are displayed as —.
       </p>
 
-      <div>
-        <Link
-          href="/competitions"
-          className="inline-block rounded-lg border border-slate-300 bg-white px-6 py-3 text-sm font-bold text-[#002144] hover:border-[#861F41]"
-        >
-          Browse All Competitions →
-        </Link>
-      </div>
+      <Link
+        href="/competitions"
+        className="inline-block rounded-lg border border-slate-300 bg-white px-6 py-3 text-sm font-bold text-[#002144]"
+      >
+        Browse Competition Archive →
+      </Link>
     </section>
   );
 }
