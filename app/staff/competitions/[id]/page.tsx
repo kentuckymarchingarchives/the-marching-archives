@@ -5,6 +5,7 @@ import { notFound, redirect } from "next/navigation";
 
 import { createClient } from "@/lib/supabase/server";
 import { UUID_PATTERN } from "@/lib/band-validation";
+
 import {
   ROUND_KINDS,
   organizationClasses,
@@ -17,6 +18,8 @@ import {
   updateCompetition,
   addCompetitionRound,
 } from "../actions";
+
+export const instant = false;
 
 type Props = {
   params: Promise<{ id: string }>;
@@ -40,32 +43,38 @@ async function CompetitionEditor({
 
   const supabase = await createClient();
 
-  const { data: auth } = await supabase.auth.getClaims();
+  const { data: auth, error: authError } =
+    await supabase.auth.getClaims();
 
-  if (!auth?.claims?.sub) {
+  if (authError || !auth?.claims?.sub) {
     redirect("/staff/login");
   }
 
-  const { data: staff } = await supabase
-    .from("staff_members")
-    .select("role, status")
-    .eq("user_id", auth.claims.sub)
-    .maybeSingle();
+  const { data: staff, error: staffError } =
+    await supabase
+      .from("staff_members")
+      .select("role, status")
+      .eq("user_id", auth.claims.sub)
+      .maybeSingle();
 
   if (
+    staffError ||
     staff?.status !== "active" ||
-    !["owner", "admin", "editor"].includes(staff.role)
+    !["owner", "admin", "editor"].includes(
+      staff.role
+    )
   ) {
     redirect("/staff/login?error=unauthorized");
   }
 
-  const { data: competition, error } = await supabase
-    .from("competitions")
-    .select(
-      "id, name, season_year, organization_code, competition_type, competition_format, smbc_stage, competition_date, city, state, country, source_url, notes, publication_status"
-    )
-    .eq("id", id)
-    .maybeSingle();
+  const { data: competition, error } =
+    await supabase
+      .from("competitions")
+      .select(
+        "id, name, season_year, organization_code, competition_type, competition_format, smbc_stage, competition_date, city, state, country, source_url, notes, publication_status"
+      )
+      .eq("id", id)
+      .maybeSingle();
 
   if (error) {
     throw new Error("Unable to load competition.");
@@ -82,12 +91,19 @@ async function CompetitionEditor({
         "id, name, round_kind, class_scope, sort_order"
       )
       .eq("competition_id", id)
-      .order("sort_order", { ascending: true })
-      .order("name", { ascending: true });
+      .order("sort_order", { ascending: true });
 
   if (roundError) {
     throw new Error("Unable to load competition rounds.");
   }
+
+  const isDraft =
+    competition.publication_status === "draft";
+
+  const canEdit =
+    isDraft ||
+    staff.role === "owner" ||
+    staff.role === "admin";
 
   const successMessage =
     messages.created === "1"
@@ -101,14 +117,6 @@ async function CompetitionEditor({
   const classes = organizationClasses(
     competition.organization_code
   );
-
-  const canEdit =
-    competition.publication_status === "draft" ||
-    staff.role === "owner" ||
-    staff.role === "admin";
-
-  const isDraft =
-    competition.publication_status === "draft";
 
   const inputClass =
     "mt-2 w-full rounded-lg border border-slate-300 bg-white px-4 py-3 text-sm text-[#002144]";
@@ -166,24 +174,26 @@ async function CompetitionEditor({
       <section className="space-y-5">
         <div>
           <h2 className="text-2xl font-bold text-[#002144]">
-            Competition Rounds
+            Competition Rounds & Results
           </h2>
 
           <p className="mt-2 text-sm text-slate-600">
-            Every round holds its own participating
-            bands, classes, placements, and scores.
+            Select a round to add participating bands,
+            classifications, scores, placements,
+            and scoring captions.
           </p>
         </div>
 
         {rounds?.length ? (
           <div className="space-y-3">
             {rounds.map((round, index) => (
-              <div
+              <Link
                 key={round.id}
-                className="flex flex-wrap items-center justify-between gap-4 rounded-xl border border-slate-200 bg-white p-5"
+                href={`/staff/competitions/${id}/rounds/${round.id}`}
+                className="flex flex-wrap items-center justify-between gap-4 rounded-xl border border-slate-200 bg-white p-5 transition hover:border-[#861F41] hover:shadow-sm"
               >
                 <div className="flex items-center gap-4">
-                  <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-[#002144] text-sm font-bold text-white">
+                  <div className="flex h-11 w-11 items-center justify-center rounded-lg bg-[#002144] text-sm font-bold text-white">
                     {index + 1}
                   </div>
 
@@ -202,16 +212,16 @@ async function CompetitionEditor({
                   </div>
                 </div>
 
-                <span className="text-xs font-bold text-slate-400">
-                  Scores in Phase 6
+                <span className="text-sm font-bold text-[#861F41]">
+                  Manage Results →
                 </span>
-              </div>
+              </Link>
             ))}
           </div>
         ) : (
           <div className="rounded-xl border border-slate-200 bg-white p-7 text-sm text-slate-600">
-            No rounds have been added. This is normal
-            for a custom-format competition.
+            No competition rounds have been created yet.
+            Add one below to begin entering historical results.
           </div>
         )}
       </section>
@@ -239,7 +249,7 @@ async function CompetitionEditor({
                 required
                 minLength={2}
                 maxLength={120}
-                placeholder="Example: International Class Finals"
+                placeholder="Example: Open Class Finals"
                 className={inputClass}
               />
             </label>
@@ -287,15 +297,14 @@ async function CompetitionEditor({
             </div>
 
             <p className="text-xs leading-6 text-slate-500">
-              Only restrict a round to one class
-              when the source documents a
-              class-specific round. Otherwise,
-              leave the scope unrestricted.
+              Use a class restriction only when
+              that specific round is limited to
+              one classification.
             </p>
 
             <button
               type="submit"
-              className="rounded-lg bg-[#002144] px-6 py-3 text-sm font-bold text-white hover:bg-[#123B63]"
+              className="rounded-lg bg-[#002144] px-6 py-3 text-sm font-bold text-white"
             >
               + Add Round
             </button>
@@ -315,23 +324,10 @@ async function CompetitionEditor({
           />
         ) : (
           <div className="rounded-xl border border-slate-200 bg-white p-6 text-sm text-slate-600">
-            This competition is published. Editors
-            cannot modify published records.
+            Editors cannot modify published
+            competition details.
           </div>
         )}
-      </section>
-
-      <section className="rounded-xl border border-slate-200 bg-white p-6">
-        <h2 className="text-xl font-bold text-[#002144]">
-          Historical Results
-        </h2>
-
-        <p className="mt-3 text-sm leading-7 text-slate-600">
-          The competition structure is ready.
-          In Phase 6, we'll add band participation,
-          classification, scores, caption breakdowns,
-          and placements for each round.
-        </p>
       </section>
     </div>
   );
