@@ -2,9 +2,7 @@
 import Image from "next/image";
 import Link from "next/link";
 
-import {
-  ORGANIZATION_LIST,
-} from "@/lib/organization-branding";
+import { ORGANIZATION_LIST } from "@/lib/organization-branding";
 
 export default function HomePage() {
   return (
@@ -37,7 +35,7 @@ export default function HomePage() {
             href="/bands"
             className="mt-10 inline-block cursor-pointer rounded-lg bg-[#861F41] px-7 py-3 font-bold text-white transition hover:bg-[#A02B52]"
           >
-            Explore Bands & Corps &rarr;
+            Explore Bands &amp; Corps &rarr;
           </Link>
         </div>
       </section>
@@ -108,14 +106,13 @@ export default function HomePage() {
             {ORGANIZATION_LIST.map((organization) => (
               <div
                 key={organization.code}
-                className="flex flex-col items-center rounded-2xl border border-slate-200 bg-[#F8FAFC] p-7 text-center transition hover:border-[#861F41] hover:shadow-md"
+                className="flex h-full flex-col items-center rounded-2xl border border-slate-200 bg-[#F8FAFC] p-7 text-center transition hover:border-[#861F41] hover:shadow-md"
               >
                 <a
                   href={organization.website}
                   target="_blank"
                   rel="noopener noreferrer"
                   aria-label={`Visit the official ${organization.name} website`}
-                  title={`Visit ${organization.name}`}
                   className="flex h-28 w-full cursor-pointer items-center justify-center rounded-xl bg-white p-4 transition hover:bg-slate-50"
                 >
                   <Image
@@ -136,14 +133,30 @@ export default function HomePage() {
                   {organization.code}
                 </p>
 
-                <a
-                  href={organization.website}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="mt-5 cursor-pointer text-sm font-bold text-[#861F41] hover:underline"
-                >
-                  Official Website &nearr;
-                </a>
+                <div className="mt-auto w-full pt-6">
+                  <a
+                    href={organization.website}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex w-full cursor-pointer items-center justify-center gap-2 rounded-lg bg-[#861F41] px-4 py-3 text-sm font-bold text-white transition hover:bg-[#A02B52] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#861F41]"
+                  >
+                    Official Website
+                    <svg
+                      viewBox="0 0 24 24"
+                      aria-hidden="true"
+                      className="h-4 w-4"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    >
+                      <path d="M13 5h6v6" />
+                      <path d="M19 5l-9 9" />
+                      <path d="M19 13v6H5V5h6" />
+                    </svg>
+                  </a>
+                </div>
               </div>
             ))}
           </div>
