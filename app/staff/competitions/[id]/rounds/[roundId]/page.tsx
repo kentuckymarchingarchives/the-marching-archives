@@ -7,9 +7,12 @@ import { createClient } from "@/lib/supabase/server";
 import { UUID_PATTERN } from "@/lib/band-validation";
 import { organizationClasses } from "@/lib/competition-config";
 
+import ResultsScrollKeeper from "@/components/ResultsScrollKeeper";
+
 import {
   addRoundEntry,
   addRoundCaption,
+  updateRoundCaption,
   saveEntryResults,
 } from "@/app/staff/competitions/results-actions";
 
@@ -29,11 +32,20 @@ type Props = {
 const inputClass =
   "mt-2 w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm text-[#002144]";
 
-const successMessages: Record<string, string> = {
+const messages: Record<string, string> = {
   added: "Band added to this round.",
-  caption: "Caption created successfully.",
-  saved: "Result changes saved.",
+  caption: "New scoring caption added.",
+  caption_saved: "Caption settings updated.",
+  saved: "Result and caption scores saved successfully.",
 };
+
+function displayScore(value: number | string | null) {
+  if (value === null || value === undefined) {
+    return "—";
+  }
+
+  return Number(value).toFixed(3);
+}
 
 async function ResultsContent({
   params,
@@ -87,7 +99,7 @@ async function ResultsContent({
   const { data: round, error: roundError } =
     await supabase
       .from("competition_rounds")
-      .select("id, name, round_kind, class_scope")
+      .select("id, name, class_scope")
       .eq("id", roundId)
       .eq("competition_id", id)
       .maybeSingle();
@@ -96,12 +108,12 @@ async function ResultsContent({
     notFound();
   }
 
+  const isDraft =
+    competition.publication_status === "draft";
+
   const classes = organizationClasses(
     competition.organization_code
   );
-
-  const isDraft =
-    competition.publication_status === "draft";
 
   const [
     { data: entries, error: entriesError },
@@ -136,12 +148,16 @@ async function ResultsContent({
     throw new Error("Unable to load round results.");
   }
 
-  const entryIds = (entries ?? []).map((entry) => entry.id);
-  const bandIds = (entries ?? []).map((entry) => entry.band_id);
+  const entryIds = (entries ?? []).map(
+    (entry) => entry.id
+  );
+  const bandIds = (entries ?? []).map(
+    (entry) => entry.band_id
+  );
 
   const [
-    { data: enteredBands, error: bandNamesError },
-    { data: scoreRows, error: scoresError },
+    { data: enteredBands, error: bandsError },
+    { data: captionScores, error: scoresError },
   ] = await Promise.all([
     bandIds.length
       ? supabase
@@ -172,19 +188,19 @@ async function ResultsContent({
         }),
   ]);
 
-  if (bandNamesError || scoresError) {
-    throw new Error("Unable to load band names or caption scores.");
+  if (bandsError || scoresError) {
+    throw new Error("Unable to load band or score details.");
   }
 
-  const bandNames = new Map(
+  const bandMap = new Map(
     (enteredBands ?? []).map((band) => [
       band.id,
       band,
     ])
   );
 
-  const scores = new Map(
-    (scoreRows ?? []).map((score) => [
+  const scoreMap = new Map(
+    (captionScores ?? []).map((score) => [
       `${score.entry_id}:${score.caption_id}`,
       score.score,
     ])
@@ -196,7 +212,7 @@ async function ResultsContent({
 
   let bandsQuery = supabase
     .from("bands")
-    .select("id, name, kind")
+    .select("id, name")
     .order("name", { ascending: true })
     .limit(100);
 
@@ -207,36 +223,100 @@ async function ResultsContent({
     );
   }
 
-  const { data: availableBands, error: availableError } =
+  const { data: searchedBands, error: searchError } =
     isDraft
       ? await bandsQuery
       : {
           data: [] as {
             id: string;
             name: string;
-            kind: string;
           }[],
           error: null,
         };
 
-  if (availableError) {
-    throw new Error("Unable to search available bands.");
+  if (searchError) {
+    throw new Error("Unable to search bands.");
   }
 
-  const enteredBandIds = new Set(bandIds);
+  const enteredIds = new Set(bandIds);
 
-  const options = (availableBands ?? []).filter(
-    (band) => !enteredBandIds.has(band.id)
+  const availableBands = (searchedBands ?? []).filter(
+    (band) => !enteredIds.has(band.id)
+  );
+
+  // Count duplicate placements so shared ranks
+  // can be marked as ties.
+  const overallCounts = new Map<number, number>();
+  const classCounts = new Map<string, number>();
+
+  for (const entry of entries ?? []) {
+    if (entry.overall_placement !== null) {
+      const rank = Number(entry.overall_placement);
+      overallCounts.set(
+        rank,
+        (overallCounts.get(rank) ?? 0) + 1
+      );
+    }
+
+    if (
+      entry.classification &&
+      entry.class_placement !== null
+    ) {
+      const key =
+        `${entry.classification}:${entry.class_placement}`;
+
+      classCounts.set(
+        key,
+        (classCounts.get(key) ?? 0) + 1
+      );
+    }
+  }
+
+  const resultRows = [...(entries ?? [])].sort(
+    (a, b) => {
+      if (
+        a.overall_placement !== null &&
+        b.overall_placement !== null
+      ) {
+        return (
+          Number(a.overall_placement) -
+          Number(b.overall_placement)
+        );
+      }
+
+      if (a.overall_placement !== null) return -1;
+      if (b.overall_placement !== null) return 1;
+
+      if (
+        a.total_score !== null &&
+        b.total_score !== null
+      ) {
+        return (
+          Number(b.total_score) -
+          Number(a.total_score)
+        );
+      }
+
+      return (
+        bandMap.get(a.band_id)?.name ?? ""
+      ).localeCompare(
+        bandMap.get(b.band_id)?.name ?? ""
+      );
+    }
   );
 
   const message =
-    filters.message &&
-    successMessages[filters.message]
-      ? successMessages[filters.message]
+    filters.message && messages[filters.message]
+      ? messages[filters.message]
       : null;
 
   return (
-    <div className="mx-auto max-w-6xl space-y-8 px-5 py-10">
+    <div
+      data-results-editor
+      className="mx-auto max-w-6xl space-y-10 px-5 py-10"
+    >
+      <ResultsScrollKeeper roundId={roundId} />
+
       <Link
         href={`/staff/competitions/${id}`}
         className="text-sm font-semibold text-[#861F41]"
@@ -244,7 +324,7 @@ async function ResultsContent({
         ← Competition Details
       </Link>
 
-      <div>
+      <header>
         <p className="text-xs font-bold uppercase tracking-widest text-[#861F41]">
           {competition.organization_code} ·{" "}
           {competition.season_year}
@@ -258,17 +338,17 @@ async function ResultsContent({
           {competition.name}
         </p>
 
-        <p className="mt-3 text-sm text-slate-500">
+        <p className="mt-2 text-sm text-slate-500">
           {round.class_scope
-            ? `Class restricted to ${round.class_scope}`
-            : "Open to all eligible classifications"}
+            ? `Classification: ${round.class_scope}`
+            : "All eligible classifications"}
         </p>
-      </div>
+      </header>
 
       {message && (
         <div
           role="status"
-          className="rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm font-semibold text-emerald-900"
+          className="rounded-xl border border-emerald-200 bg-emerald-50 px-5 py-4 text-sm font-semibold text-emerald-900"
         >
           {message}
         </div>
@@ -276,15 +356,14 @@ async function ResultsContent({
 
       {!isDraft && (
         <div className="rounded-xl border border-amber-200 bg-amber-50 p-5 text-sm text-amber-900">
-          This competition is published. Its results
-          are locked against changes in this editor.
+          Published competition results are read-only.
         </div>
       )}
 
       <div className="grid gap-4 sm:grid-cols-3">
         <div className="rounded-xl border border-slate-200 bg-white p-5">
           <p className="text-xs uppercase tracking-wider text-slate-500">
-            Entered Bands
+            Bands Entered
           </p>
           <p className="mt-2 text-3xl font-bold text-[#002144]">
             {entries?.length ?? 0}
@@ -293,7 +372,7 @@ async function ResultsContent({
 
         <div className="rounded-xl border border-slate-200 bg-white p-5">
           <p className="text-xs uppercase tracking-wider text-slate-500">
-            Captions
+            Scoring Captions
           </p>
           <p className="mt-2 text-3xl font-bold text-[#002144]">
             {captions?.length ?? 0}
@@ -302,16 +381,129 @@ async function ResultsContent({
 
         <div className="rounded-xl border border-slate-200 bg-white p-5">
           <p className="text-xs uppercase tracking-wider text-slate-500">
-            Publication
+            Record Status
           </p>
-          <p className="mt-2 text-lg font-bold text-[#002144]">
+          <p className="mt-2 text-xl font-bold text-[#002144]">
             {isDraft ? "Draft" : "Published"}
           </p>
         </div>
       </div>
 
+      {/* Compact results overview */}
+      <section id="overview" className="scroll-mt-6 space-y-4">
+        <div>
+          <h2 className="text-2xl font-bold text-[#002144]">
+            Results Overview
+          </h2>
+          <p className="mt-2 text-sm text-slate-600">
+            Quick reference for all entered performances.
+            Select Edit to jump to a band's scoring form.
+          </p>
+        </div>
+
+        <div className="overflow-x-auto rounded-2xl border border-slate-200 bg-white">
+          <table className="w-full min-w-[650px] text-left text-sm">
+            <thead className="bg-[#002144] text-white">
+              <tr>
+                <th className="px-5 py-4">Overall</th>
+                <th className="px-5 py-4">Ensemble</th>
+                <th className="px-5 py-4">Class</th>
+                <th className="px-5 py-4">Class Rank</th>
+                <th className="px-5 py-4 text-right">Score</th>
+                <th className="px-5 py-4 text-right">Edit</th>
+              </tr>
+            </thead>
+
+            <tbody className="divide-y divide-slate-100">
+              {resultRows.map((entry) => {
+                const band = bandMap.get(entry.band_id);
+
+                const overallTie =
+                  entry.overall_placement !== null &&
+                  (overallCounts.get(
+                    Number(entry.overall_placement)
+                  ) ?? 0) > 1;
+
+                const classTie =
+                  entry.classification &&
+                  entry.class_placement !== null &&
+                  (classCounts.get(
+                    `${entry.classification}:${entry.class_placement}`
+                  ) ?? 0) > 1;
+
+                return (
+                  <tr
+                    key={entry.id}
+                    className="hover:bg-slate-50"
+                  >
+                    <td className="px-5 py-4 font-semibold text-[#002144]">
+                      {entry.overall_placement ?? "—"}
+                      {overallTie && (
+                        <span className="ml-1 text-xs text-[#861F41]">
+                          (T)
+                        </span>
+                      )}
+                    </td>
+
+                    <td className="px-5 py-4 font-semibold text-[#002144]">
+                      {band?.name ?? "Unknown Band"}
+                    </td>
+
+                    <td className="px-5 py-4 text-slate-600">
+                      {entry.classification ?? "—"}
+                    </td>
+
+                    <td className="px-5 py-4 text-slate-600">
+                      {entry.class_placement ?? "—"}
+                      {classTie && (
+                        <span className="ml-1 text-xs text-[#861F41]">
+                          (T)
+                        </span>
+                      )}
+                    </td>
+
+                    <td className="px-5 py-4 text-right font-bold tabular-nums text-[#002144]">
+                      {displayScore(entry.total_score)}
+                    </td>
+
+                    <td className="px-5 py-4 text-right">
+                      <a
+                        href={`#entry-${entry.id}`}
+                        className="font-semibold text-[#861F41] hover:underline"
+                      >
+                        Edit ↓
+                      </a>
+                    </td>
+                  </tr>
+                );
+              })}
+
+              {resultRows.length === 0 && (
+                <tr>
+                  <td
+                    colSpan={6}
+                    className="px-5 py-10 text-center text-slate-500"
+                  >
+                    No results have been entered yet.
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+
+        <p className="text-xs text-slate-500">
+          (T) indicates a shared placement.
+          The archive preserves entered rankings rather
+          than calculating or adjusting them automatically.
+        </p>
+      </section>
+
       {isDraft && (
-        <section className="space-y-5">
+        <section
+          id="add-band"
+          className="scroll-mt-6 space-y-5"
+        >
           <h2 className="text-2xl font-bold text-[#002144]">
             Add a Band or Corps
           </h2>
@@ -320,14 +512,15 @@ async function ResultsContent({
             method="get"
             className="rounded-xl border border-slate-200 bg-white p-5"
           >
-            <label className="text-sm font-semibold text-[#002144]">
-              Find a Band
+            <label className="block text-sm font-semibold text-[#002144]">
+              Search Band Database
+
               <div className="mt-2 flex flex-wrap gap-3">
                 <input
-                  type="search"
                   name="band_q"
+                  type="search"
                   defaultValue={bandSearch}
-                  placeholder="Search the band database..."
+                  placeholder="Search by ensemble name..."
                   className="min-w-0 flex-1 rounded-lg border border-slate-300 px-4 py-3"
                 />
 
@@ -335,7 +528,7 @@ async function ResultsContent({
                   type="submit"
                   className="rounded-lg bg-[#002144] px-5 py-3 font-semibold text-white"
                 >
-                  Find Band
+                  Search
                 </button>
               </div>
             </label>
@@ -361,16 +554,13 @@ async function ResultsContent({
               <select
                 name="band_id"
                 required
-                key={bandSearch}
                 defaultValue=""
+                key={bandSearch}
                 className={inputClass}
               >
-                <option value="">Select a band</option>
-                {options.map((band) => (
-                  <option
-                    key={band.id}
-                    value={band.id}
-                  >
+                <option value="">Choose an ensemble</option>
+                {availableBands.map((band) => (
+                  <option key={band.id} value={band.id}>
                     {band.name}
                   </option>
                 ))}
@@ -378,22 +568,19 @@ async function ResultsContent({
             </label>
 
             <label className="block text-sm font-semibold text-[#002144]">
-              Competition Class
+              Competition Classification
               <select
                 name="classification"
                 defaultValue={round.class_scope ?? ""}
                 className={inputClass}
               >
-                <option value="">
-                  Unclassified / Exhibition
-                </option>
-
-                {classes.map((className) => (
+                <option value="">Unclassified / Exhibition</option>
+                {classes.map((classification) => (
                   <option
-                    key={className}
-                    value={className}
+                    key={classification}
+                    value={classification}
                   >
-                    {className}
+                    {classification}
                   </option>
                 ))}
               </select>
@@ -402,16 +589,15 @@ async function ResultsContent({
             <div className="md:col-span-2">
               <button
                 type="submit"
-                disabled={options.length === 0}
+                disabled={!availableBands.length}
                 className="rounded-lg bg-[#861F41] px-6 py-3 text-sm font-bold text-white disabled:opacity-50"
               >
                 + Add to Round
               </button>
 
               <p className="mt-3 text-xs text-slate-500">
-                Showing up to 100 matching, unentered bands.
-                If a band is missing, search its name above
-                or create its profile in Band Management.
+                Up to 100 matching unentered bands
+                are displayed.
               </p>
 
               <Link
@@ -425,40 +611,101 @@ async function ResultsContent({
         </section>
       )}
 
-      <section className="space-y-5">
-        <h2 className="text-2xl font-bold text-[#002144]">
-          Scoring Captions
-        </h2>
+      {/* Caption management */}
+      <section id="captions" className="scroll-mt-6 space-y-5">
+        <div>
+          <h2 className="text-2xl font-bold text-[#002144]">
+            Caption Management
+          </h2>
 
-        <p className="text-sm leading-6 text-slate-600">
-          Define only captions documented by the
-          official scoring source. Each round has
-          independent caption definitions.
-        </p>
+          <p className="mt-2 text-sm text-slate-600">
+            Define and edit scoring captions for this round.
+            Enter values documented by the historical source.
+          </p>
+        </div>
 
         {captions?.length ? (
-          <div className="overflow-hidden rounded-xl border border-slate-200 bg-white">
+          <div className="space-y-3">
             {captions.map((caption) => (
-              <div
+              <form
+                id={`caption-${caption.id}`}
                 key={caption.id}
-                className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 px-5 py-4"
+                action={updateRoundCaption}
+                className="scroll-mt-6 grid gap-4 rounded-xl border border-slate-200 bg-white p-5 md:grid-cols-[2fr_1fr_1fr_auto] md:items-end"
               >
-                <p className="font-semibold text-[#002144]">
-                  {caption.name}
-                </p>
+                <input
+                  type="hidden"
+                  name="competition_id"
+                  value={id}
+                />
+                <input
+                  type="hidden"
+                  name="round_id"
+                  value={roundId}
+                />
+                <input
+                  type="hidden"
+                  name="caption_id"
+                  value={caption.id}
+                />
 
-                <p className="text-xs text-slate-500">
-                  Max {caption.max_score} · Multiplier{" "}
-                  {caption.multiplier}
-                </p>
-              </div>
+                <label className="text-sm font-semibold text-[#002144]">
+                  Caption
+                  <input
+                    name="name"
+                    required
+                    maxLength={100}
+                    defaultValue={caption.name}
+                    disabled={!isDraft}
+                    className={inputClass}
+                  />
+                </label>
+
+                <label className="text-sm font-semibold text-[#002144]">
+                  Maximum
+                  <input
+                    name="max_score"
+                    type="number"
+                    min="0.0001"
+                    max="999999"
+                    step="0.0001"
+                    required
+                    defaultValue={caption.max_score}
+                    disabled={!isDraft}
+                    className={inputClass}
+                  />
+                </label>
+
+                <label className="text-sm font-semibold text-[#002144]">
+                  Multiplier
+                  <input
+                    name="multiplier"
+                    type="number"
+                    min="0"
+                    max="999999"
+                    step="0.0001"
+                    required
+                    defaultValue={caption.multiplier}
+                    disabled={!isDraft}
+                    className={inputClass}
+                  />
+                </label>
+
+                {isDraft && (
+                  <button
+                    type="submit"
+                    className="rounded-lg bg-[#002144] px-5 py-2.5 text-sm font-bold text-white"
+                  >
+                    Save Caption
+                  </button>
+                )}
+              </form>
             ))}
           </div>
         ) : (
-          <p className="rounded-xl border border-slate-200 bg-white p-6 text-sm text-slate-600">
-            No captions have been defined yet.
-            You can still enter total scores.
-          </p>
+          <div className="rounded-xl border border-slate-200 bg-white p-6 text-sm text-slate-600">
+            No captions have been configured.
+          </div>
         )}
 
         {isDraft && (
@@ -478,7 +725,7 @@ async function ResultsContent({
             />
 
             <label className="text-sm font-semibold text-[#002144]">
-              Caption Name *
+              New Caption Name *
               <input
                 name="name"
                 required
@@ -496,8 +743,8 @@ async function ResultsContent({
                 min="0.0001"
                 max="999999"
                 step="0.0001"
-                required
                 defaultValue="100"
+                required
                 className={inputClass}
               />
             </label>
@@ -510,8 +757,8 @@ async function ResultsContent({
                 min="0"
                 max="999999"
                 step="0.0001"
-                required
                 defaultValue="1"
+                required
                 className={inputClass}
               />
             </label>
@@ -521,33 +768,43 @@ async function ResultsContent({
                 type="submit"
                 className="rounded-lg bg-[#002144] px-6 py-3 text-sm font-bold text-white"
               >
-                + Add Caption
+                + Add Scoring Caption
               </button>
             </div>
           </form>
         )}
       </section>
 
-      <section className="space-y-5">
-        <h2 className="text-2xl font-bold text-[#002144]">
-          Round Results
-        </h2>
+      {/* Individual results */}
+      <section id="results" className="scroll-mt-6 space-y-5">
+        <div>
+          <h2 className="text-2xl font-bold text-[#002144]">
+            Individual Results
+          </h2>
 
-        <p className="text-sm leading-6 text-slate-600">
-          Enter officially documented totals and placements.
-          Leave unknown values blank rather than guessing.
-        </p>
+          <p className="mt-2 text-sm text-slate-600">
+            Edit one performance at a time. Unknown
+            scores and placements may be left blank.
+          </p>
+        </div>
 
-        {entries?.length ? (
+        {resultRows.length ? (
           <div className="space-y-5">
-            {entries.map((entry) => {
-              const band = bandNames.get(entry.band_id);
+            {resultRows.map((entry) => {
+              const band = bandMap.get(entry.band_id);
+
+              const overallTie =
+                entry.overall_placement !== null &&
+                (overallCounts.get(
+                  Number(entry.overall_placement)
+                ) ?? 0) > 1;
 
               return (
                 <form
+                  id={`entry-${entry.id}`}
                   key={entry.id}
                   action={saveEntryResults}
-                  className="space-y-5 rounded-2xl border border-slate-200 bg-white p-6"
+                  className="scroll-mt-6 space-y-5 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm"
                 >
                   <input
                     type="hidden"
@@ -565,7 +822,7 @@ async function ResultsContent({
                     value={entry.id}
                   />
 
-                  <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 pb-4">
+                  <div className="flex flex-wrap items-center justify-between gap-4 border-b border-slate-100 pb-4">
                     <div>
                       <h3 className="text-xl font-bold text-[#002144]">
                         {band?.name ?? "Unknown Band"}
@@ -574,18 +831,21 @@ async function ResultsContent({
                       {band?.slug && (
                         <Link
                           href={`/bands/${band.slug}`}
-                          className="mt-1 inline-block text-xs font-semibold text-[#861F41]"
+                          className="mt-2 inline-block text-xs font-semibold text-[#861F41]"
                         >
                           View Band Profile →
                         </Link>
                       )}
                     </div>
 
-                    {entry.overall_placement && (
-                      <span className="rounded-full bg-[#002144] px-4 py-2 text-xs font-bold text-white">
-                        Overall #{entry.overall_placement}
-                      </span>
-                    )}
+                    <div className="flex items-center gap-2">
+                      {entry.overall_placement !== null && (
+                        <span className="rounded-full bg-[#002144] px-4 py-2 text-xs font-bold text-white">
+                          {overallTie ? "Tied " : ""}
+                          #{entry.overall_placement} Overall
+                        </span>
+                      )}
+                    </div>
                   </div>
 
                   <div className="grid gap-4 md:grid-cols-4">
@@ -599,15 +859,13 @@ async function ResultsContent({
                         disabled={!isDraft}
                         className={inputClass}
                       >
-                        <option value="">
-                          Unclassified
-                        </option>
-                        {classes.map((className) => (
+                        <option value="">Unclassified</option>
+                        {classes.map((classification) => (
                           <option
-                            key={className}
-                            value={className}
+                            key={classification}
+                            value={classification}
                           >
-                            {className}
+                            {classification}
                           </option>
                         ))}
                       </select>
@@ -621,10 +879,10 @@ async function ResultsContent({
                         min="0"
                         max="999999"
                         step="0.0001"
-                        disabled={!isDraft}
                         defaultValue={
                           entry.total_score ?? ""
                         }
+                        disabled={!isDraft}
                         className={inputClass}
                       />
                     </label>
@@ -636,10 +894,10 @@ async function ResultsContent({
                         type="number"
                         min="1"
                         step="1"
-                        disabled={!isDraft}
                         defaultValue={
                           entry.class_placement ?? ""
                         }
+                        disabled={!isDraft}
                         className={inputClass}
                       />
                     </label>
@@ -651,19 +909,19 @@ async function ResultsContent({
                         type="number"
                         min="1"
                         step="1"
-                        disabled={!isDraft}
                         defaultValue={
                           entry.overall_placement ?? ""
                         }
+                        disabled={!isDraft}
                         className={inputClass}
                       />
                     </label>
                   </div>
 
-                  {captions && captions.length > 0 && (
+                  {!!captions?.length && (
                     <div>
                       <h4 className="mb-3 text-sm font-bold text-[#002144]">
-                        Caption Breakdown
+                        Caption Scores
                       </h4>
 
                       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
@@ -673,6 +931,7 @@ async function ResultsContent({
                             className="text-sm font-semibold text-[#002144]"
                           >
                             {caption.name}
+
                             <input
                               name={`caption_${caption.id}`}
                               type="number"
@@ -681,7 +940,7 @@ async function ResultsContent({
                               step="0.0001"
                               disabled={!isDraft}
                               defaultValue={
-                                scores.get(
+                                scoreMap.get(
                                   `${entry.id}:${caption.id}`
                                 ) ?? ""
                               }
@@ -689,7 +948,7 @@ async function ResultsContent({
                             />
 
                             <span className="mt-1 block text-xs font-normal text-slate-500">
-                              Maximum: {caption.max_score}
+                              Max: {caption.max_score}
                             </span>
                           </label>
                         ))}
@@ -703,20 +962,29 @@ async function ResultsContent({
                       name="notes"
                       rows={2}
                       maxLength={5000}
-                      disabled={!isDraft}
                       defaultValue={entry.notes ?? ""}
-                      placeholder="Ties, penalties, disqualifications, or historical notes..."
+                      disabled={!isDraft}
+                      placeholder="Historical notes, ties, penalties, or exceptions..."
                       className={inputClass}
                     />
                   </label>
 
                   {isDraft && (
-                    <button
-                      type="submit"
-                      className="rounded-lg bg-[#861F41] px-6 py-3 text-sm font-bold text-white hover:bg-[#701832]"
-                    >
-                      Save Result
-                    </button>
+                    <div className="flex flex-wrap items-center justify-between gap-3">
+                      <button
+                        type="submit"
+                        className="rounded-lg bg-[#861F41] px-6 py-3 text-sm font-bold text-white hover:bg-[#701832]"
+                      >
+                        Save Result
+                      </button>
+
+                      <a
+                        href="#overview"
+                        className="text-sm font-semibold text-[#861F41]"
+                      >
+                        Back to Results Overview ↑
+                      </a>
+                    </div>
                   )}
                 </form>
               );
@@ -724,13 +992,13 @@ async function ResultsContent({
           </div>
         ) : (
           <div className="rounded-xl border border-slate-200 bg-white p-8 text-sm text-slate-600">
-            No bands have been entered in this round yet.
+            There are no bands in this round yet.
           </div>
         )}
 
         <p className="text-xs text-slate-500">
-          Showing up to 500 round entries.
-          Larger archival records will require pagination.
+          Showing up to 500 entries. A later phase
+          will add pagination and bulk importing.
         </p>
       </section>
     </div>

@@ -1,95 +1,109 @@
 
 import { Suspense } from "react";
 import Link from "next/link";
+
 import { createClient } from "@/lib/supabase/server";
+import { UUID_PATTERN } from "@/lib/band-validation";
 import ArchiveControls from "@/components/ArchiveControls";
 
 type Props = {
   children: React.ReactNode;
-  params: Promise<{
-    id: string;
-    roundId: string;
-  }>;
+  params: Promise<{ id: string }>;
 };
 
-async function RoundNavigation({
+async function CompetitionToolbar({
   params,
 }: {
   params: Props["params"];
 }) {
-  const { id, roundId } = await params;
+  const { id } = await params;
 
-  const base =
-    `/staff/competitions/${id}/rounds/${roundId}`;
+  if (!UUID_PATTERN.test(id)) {
+    return null;
+  }
 
   const supabase = await createClient();
-  const { data: auth } = await supabase.auth.getClaims();
 
-  let canManage = false;
+  const { data: auth, error: authError } =
+    await supabase.auth.getClaims();
 
-  if (auth?.claims?.sub) {
-    const { data: staff } = await supabase
+  if (authError || !auth?.claims?.sub) {
+    return null;
+  }
+
+  const { data: staff, error: staffError } =
+    await supabase
       .from("staff_members")
       .select("role, status")
       .eq("user_id", auth.claims.sub)
       .maybeSingle();
 
-    canManage =
-      staff?.status === "active" &&
-      ["owner", "admin"].includes(staff.role);
+  if (
+    staffError ||
+    staff?.status !== "active" ||
+    !["owner", "admin", "editor"].includes(staff.role)
+  ) {
+    return null;
   }
 
-  const { data: round } = await supabase
-    .from("competition_rounds")
-    .select("id, name, archived_at")
-    .eq("id", roundId)
-    .eq("competition_id", id)
-    .maybeSingle();
+  const { data: competition, error } =
+    await supabase
+      .from("competitions")
+      .select("id, name, archived_at")
+      .eq("id", id)
+      .maybeSingle();
+
+  if (error || !competition) {
+    return null;
+  }
+
+  const canManageArchive =
+    staff.role === "owner" ||
+    staff.role === "admin";
 
   return (
     <div className="border-b border-slate-200 bg-white">
-      <nav
-        aria-label="Round management"
-        className="mx-auto flex max-w-6xl flex-wrap items-center gap-3 px-6 py-4"
-      >
-        <Link
-          href={base}
-          className="rounded-lg bg-[#002144] px-5 py-2.5 text-sm font-bold text-white"
-        >
-          Results Editor
-        </Link>
+      <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-5 px-6 py-5">
+        <div>
+          <p className="text-xs font-bold uppercase tracking-wider text-[#861F41]">
+            Competition Management
+          </p>
 
-        <Link
-          href={`${base}/tools`}
-          className="rounded-lg bg-[#861F41] px-5 py-2.5 text-sm font-bold text-white"
-        >
-          Results Tools
-        </Link>
+          <p className="mt-1 text-sm font-semibold text-[#002144]">
+            {competition.name}
+          </p>
+        </div>
 
-        <Link
-          href={`/staff/competitions/${id}`}
-          className="ml-auto text-sm font-semibold text-slate-600 hover:text-[#861F41]"
-        >
-          Competition Details →
-        </Link>
-      </nav>
+        <div className="flex flex-wrap items-center gap-3">
+          <Link
+            href={`/staff/competitions/${id}/review`}
+            className="cursor-pointer rounded-lg bg-[#002144] px-5 py-3 text-sm font-bold text-white hover:bg-[#123B63]"
+          >
+            Review Results →
+          </Link>
 
-      {canManage && round && (
-        <div className="border-t border-slate-100">
-          <div className="mx-auto flex max-w-6xl flex-wrap items-center gap-5 px-6 py-4">
-            <ArchiveControls
-              kind="round"
-              recordId={round.id}
-              name={round.name}
-              archived={Boolean(round.archived_at)}
-            />
-
+          {canManageArchive && (
             <Link
               href="/staff/archive"
-              className="text-sm font-semibold text-[#861F41]"
+              className="cursor-pointer rounded-lg border border-slate-300 bg-white px-5 py-3 text-sm font-bold text-[#002144] hover:bg-slate-50"
             >
-              Open Archive Center →
+              Archive Center
             </Link>
+          )}
+        </div>
+      </div>
+
+      {canManageArchive && (
+        <div className="border-t border-slate-100">
+          <div className="mx-auto max-w-6xl px-6 py-4">
+            <ArchiveControls
+              kind="competition"
+              recordId={competition.id}
+              name={competition.name}
+              archived={Boolean(
+                competition.archived_at
+              )}
+            />
           </div>
         </div>
       )}
@@ -97,20 +111,14 @@ async function RoundNavigation({
   );
 }
 
-export default function RoundLayout({
+export default function CompetitionLayout({
   children,
   params,
 }: Props) {
   return (
     <>
-      <Suspense
-        fallback={
-          <div className="border-b border-slate-200 bg-white p-4 text-sm text-slate-500">
-            Loading round navigation...
-          </div>
-        }
-      >
-        <RoundNavigation params={params} />
+      <Suspense fallback={null}>
+        <CompetitionToolbar params={params} />
       </Suspense>
 
       {children}

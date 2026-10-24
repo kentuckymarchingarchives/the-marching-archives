@@ -7,13 +7,13 @@ import { createClient } from "@/lib/supabase/server";
 import { UUID_PATTERN } from "@/lib/band-validation";
 import { organizationClasses } from "@/lib/competition-config";
 
-function getText(form: FormData, key: string) {
+function read(form: FormData, key: string): string {
   const value = form.get(key);
   return typeof value === "string" ? value.trim() : "";
 }
 
-function getId(form: FormData, key: string) {
-  const value = getText(form, key);
+function getId(form: FormData, key: string): string {
+  const value = read(form, key);
 
   if (!UUID_PATTERN.test(value)) {
     throw new Error(`Invalid ${key}.`);
@@ -22,46 +22,64 @@ function getId(form: FormData, key: string) {
   return value;
 }
 
-function optionalDecimal(
-  value: string,
+function decimal(
+  input: string,
   label: string
 ): number | null {
-  if (!value) return null;
+  if (input === "") return null;
 
-  if (!/^\d+(?:\.\d{1,4})?$/.test(value)) {
+  if (!/^\d+(?:\.\d{1,4})?$/.test(input)) {
     throw new Error(
-      `${label} must be a nonnegative number with up to four decimals.`
+      `${label} must be a nonnegative number with up to four decimal places.`
     );
   }
 
-  const result = Number(value);
+  const value = Number(input);
 
-  if (!Number.isFinite(result) || result > 999999) {
+  if (!Number.isFinite(value) || value > 999999) {
     throw new Error(`Invalid ${label}.`);
   }
 
-  return result;
+  return value;
 }
 
-function optionalPlacement(
-  value: string
-): number | null {
-  if (!value) return null;
+function placement(input: string): number | null {
+  if (!input) return null;
 
-  const result = Number(value);
-
-  if (
-    !/^\d+$/.test(value) ||
-    !Number.isSafeInteger(result) ||
-    result < 1 ||
-    result > 1000000
-  ) {
-    throw new Error(
-      "Placements must be positive whole numbers."
-    );
+  if (!/^\d+$/.test(input)) {
+    throw new Error("Placements must be whole numbers.");
   }
 
-  return result;
+  const value = Number(input);
+
+  if (
+    !Number.isSafeInteger(value) ||
+    value < 1 ||
+    value > 1000000
+  ) {
+    throw new Error("Invalid placement.");
+  }
+
+  return value;
+}
+
+function returnUrl(
+  competitionId: string,
+  roundId: string,
+  message: string,
+  anchor: string
+) {
+  return (
+    `/staff/competitions/${competitionId}` +
+    `/rounds/${roundId}?message=${message}` +
+    `#${anchor}`
+  );
+}
+
+function refresh(competitionId: string, roundId: string) {
+  revalidatePath(
+    `/staff/competitions/${competitionId}/rounds/${roundId}`
+  );
 }
 
 async function requireDraftRound(
@@ -105,7 +123,7 @@ async function requireDraftRound(
 
   if (competition.publication_status !== "draft") {
     throw new Error(
-      "Published competition results are locked. Edit a draft instead."
+      "Published competition results are locked."
     );
   }
 
@@ -118,23 +136,10 @@ async function requireDraftRound(
       .maybeSingle();
 
   if (roundError || !round) {
-    throw new Error(
-      "Round does not belong to this competition."
-    );
+    throw new Error("Round not found.");
   }
 
   return { supabase, competition, round };
-}
-
-function resultsUrl(
-  competitionId: string,
-  roundId: string,
-  message: string
-) {
-  return (
-    `/staff/competitions/${competitionId}` +
-    `/rounds/${roundId}?message=${message}`
-  );
 }
 
 export async function addRoundEntry(form: FormData) {
@@ -146,23 +151,22 @@ export async function addRoundEntry(form: FormData) {
     await requireDraftRound(competitionId, roundId);
 
   const classification =
-    getText(form, "classification") || null;
+    read(form, "classification") || null;
 
-  const classes = organizationClasses(
-    competition.organization_code
-  );
-
-  if (classification && !classes.includes(classification)) {
+  if (
+    classification &&
+    !organizationClasses(
+      competition.organization_code
+    ).includes(classification)
+  ) {
     throw new Error("Invalid classification.");
   }
 
   if (
-    round.class_scope !== null &&
+    round.class_scope &&
     classification !== round.class_scope
   ) {
-    throw new Error(
-      `This round requires ${round.class_scope} classification.`
-    );
+    throw new Error("Classification does not match round.");
   }
 
   const { data: band, error: bandError } =
@@ -173,7 +177,7 @@ export async function addRoundEntry(form: FormData) {
       .maybeSingle();
 
   if (bandError || !band) {
-    throw new Error("Selected band was not found.");
+    throw new Error("Band not found.");
   }
 
   const { error } = await supabase
@@ -191,15 +195,20 @@ export async function addRoundEntry(form: FormData) {
       );
     }
 
-    console.error("Add entry:", error.message);
-    throw new Error("Unable to add band to round.");
+    console.error("Add band:", error.message);
+    throw new Error("Unable to add band.");
   }
 
-  revalidatePath(
-    `/staff/competitions/${competitionId}/rounds/${roundId}`
-  );
+  refresh(competitionId, roundId);
 
-  redirect(resultsUrl(competitionId, roundId, "added"));
+  redirect(
+    returnUrl(
+      competitionId,
+      roundId,
+      "added",
+      "add-band"
+    )
+  );
 }
 
 export async function addRoundCaption(form: FormData) {
@@ -209,18 +218,18 @@ export async function addRoundCaption(form: FormData) {
   const { supabase } =
     await requireDraftRound(competitionId, roundId);
 
-  const name = getText(form, "name");
-  const max = optionalDecimal(
-    getText(form, "max_score"),
+  const name = read(form, "name");
+  const max = decimal(
+    read(form, "max_score"),
     "Maximum score"
   );
-  const multiplier = optionalDecimal(
-    getText(form, "multiplier"),
+  const multiplier = decimal(
+    read(form, "multiplier"),
     "Multiplier"
   );
 
   if (name.length < 2 || name.length > 100) {
-    throw new Error("Caption name must have 2–100 characters.");
+    throw new Error("Invalid caption name.");
   }
 
   if (max === null || max <= 0) {
@@ -228,7 +237,7 @@ export async function addRoundCaption(form: FormData) {
   }
 
   if (multiplier === null) {
-    throw new Error("A caption multiplier is required.");
+    throw new Error("Multiplier is required.");
   }
 
   const { data: existing, error: listError } =
@@ -240,10 +249,8 @@ export async function addRoundCaption(form: FormData) {
       .limit(1);
 
   if (listError) {
-    throw new Error("Unable to check existing captions.");
+    throw new Error("Unable to read existing captions.");
   }
-
-  const nextOrder = (existing?.[0]?.sort_order ?? 0) + 1;
 
   const { error } = await supabase
     .from("score_captions")
@@ -252,21 +259,99 @@ export async function addRoundCaption(form: FormData) {
       name,
       max_score: max,
       multiplier,
-      sort_order: nextOrder,
+      sort_order:
+        (existing?.[0]?.sort_order ?? 0) + 1,
     });
 
   if (error) {
     console.error("Add caption:", error.message);
+    throw new Error("Unable to create caption.");
+  }
+
+  refresh(competitionId, roundId);
+
+  redirect(
+    returnUrl(
+      competitionId,
+      roundId,
+      "caption",
+      "captions"
+    )
+  );
+}
+
+export async function updateRoundCaption(form: FormData) {
+  const competitionId = getId(form, "competition_id");
+  const roundId = getId(form, "round_id");
+  const captionId = getId(form, "caption_id");
+
+  const { supabase } =
+    await requireDraftRound(competitionId, roundId);
+
+  const name = read(form, "name");
+  const max = decimal(
+    read(form, "max_score"),
+    "Maximum score"
+  );
+  const multiplier = decimal(
+    read(form, "multiplier"),
+    "Multiplier"
+  );
+
+  if (name.length < 2 || name.length > 100) {
+    throw new Error("Invalid caption name.");
+  }
+
+  if (max === null || max <= 0 || multiplier === null) {
+    throw new Error("Invalid caption settings.");
+  }
+
+  // Prevent lowering the maximum below a saved score.
+  const { data: existingScores, error: scoresError } =
+    await supabase
+      .from("caption_scores")
+      .select("score")
+      .eq("caption_id", captionId)
+      .gt("score", max)
+      .limit(1);
+
+  if (scoresError) {
+    throw new Error("Unable to validate existing scores.");
+  }
+
+  if (existingScores?.length) {
     throw new Error(
-      "Unable to add caption. Check for a duplicate name."
+      "The new maximum is below an existing caption score."
     );
   }
 
-  revalidatePath(
-    `/staff/competitions/${competitionId}/rounds/${roundId}`
-  );
+  const { data: updated, error } = await supabase
+    .from("score_captions")
+    .update({
+      name,
+      max_score: max,
+      multiplier,
+    })
+    .eq("id", captionId)
+    .eq("round_id", roundId)
+    .select("id")
+    .maybeSingle();
 
-  redirect(resultsUrl(competitionId, roundId, "caption"));
+  if (error || !updated) {
+    console.error("Update caption:", error?.message);
+    throw new Error("Unable to update caption.");
+  }
+
+  refresh(competitionId, roundId);
+
+  redirect(
+    returnUrl(
+      competitionId,
+      roundId,
+      "caption_saved",
+      `caption-${captionId}`
+    )
+  );
 }
 
 export async function saveEntryResults(form: FormData) {
@@ -277,26 +362,15 @@ export async function saveEntryResults(form: FormData) {
   const { supabase, competition, round } =
     await requireDraftRound(competitionId, roundId);
 
-  const { data: entry, error: entryError } =
-    await supabase
-      .from("competition_entries")
-      .select("id")
-      .eq("id", entryId)
-      .eq("round_id", roundId)
-      .maybeSingle();
-
-  if (entryError || !entry) {
-    throw new Error("Result entry not found.");
-  }
-
   const classification =
-    getText(form, "classification") || null;
+    read(form, "classification") || null;
 
-  const classes = organizationClasses(
-    competition.organization_code
-  );
-
-  if (classification && !classes.includes(classification)) {
+  if (
+    classification &&
+    !organizationClasses(
+      competition.organization_code
+    ).includes(classification)
+  ) {
     throw new Error("Invalid classification.");
   }
 
@@ -304,111 +378,89 @@ export async function saveEntryResults(form: FormData) {
     round.class_scope &&
     classification !== round.class_scope
   ) {
-    throw new Error(
-      "Classification must match the round's class."
-    );
+    throw new Error("Classification does not match round.");
   }
 
-  const totalScore = optionalDecimal(
-    getText(form, "total_score"),
+  const totalScore = decimal(
+    read(form, "total_score"),
     "Total score"
   );
-
-  const classPlacement = optionalPlacement(
-    getText(form, "class_placement")
+  const classPlacement = placement(
+    read(form, "class_placement")
   );
-
-  const overallPlacement = optionalPlacement(
-    getText(form, "overall_placement")
+  const overallPlacement = placement(
+    read(form, "overall_placement")
   );
-
-  const notes = getText(form, "notes");
+  const notes = read(form, "notes");
 
   if (notes.length > 5000) {
-    throw new Error("Notes cannot exceed 5000 characters.");
+    throw new Error("Notes are too long.");
   }
 
-  const { data: captions, error: captionError } =
+  const { data: captions, error: captionsError } =
     await supabase
       .from("score_captions")
       .select("id, name, max_score")
       .eq("round_id", roundId);
 
-  if (captionError) {
-    throw new Error("Unable to validate caption definitions.");
+  if (captionsError) {
+    throw new Error("Unable to load captions.");
   }
 
-  // Validate all caption inputs before changing data.
-  const suppliedScores = (captions ?? []).map((caption) => {
-    const raw = getText(form, `caption_${caption.id}`);
-    const value = optionalDecimal(raw, caption.name);
-
-    if (
-      value !== null &&
-      value > Number(caption.max_score)
-    ) {
-      throw new Error(
-        `${caption.name} exceeds its maximum score.`
+  const captionScores = (captions ?? []).map(
+    (caption) => {
+      const value = decimal(
+        read(form, `caption_${caption.id}`),
+        caption.name
       );
-    }
 
-    return { captionId: caption.id, value };
-  });
-
-  const { error: updateError } = await supabase
-    .from("competition_entries")
-    .update({
-      classification,
-      total_score: totalScore,
-      class_placement: classPlacement,
-      overall_placement: overallPlacement,
-      notes: notes || null,
-    })
-    .eq("id", entryId)
-    .eq("round_id", roundId);
-
-  if (updateError) {
-    console.error("Save results:", updateError.message);
-    throw new Error("Unable to save result details.");
-  }
-
-  for (const score of suppliedScores) {
-    if (score.value === null) {
-      const { error } = await supabase
-        .from("caption_scores")
-        .delete()
-        .eq("entry_id", entryId)
-        .eq("caption_id", score.captionId);
-
-      if (error) {
+      if (
+        value !== null &&
+        value > Number(caption.max_score)
+      ) {
         throw new Error(
-          "Result details saved, but a caption score could not be cleared."
+          `${caption.name} exceeds its maximum score.`
         );
       }
-    } else {
-      const { error } = await supabase
-        .from("caption_scores")
-        .upsert(
-          {
-            entry_id: entryId,
-            caption_id: score.captionId,
-            score: score.value,
-          },
-          { onConflict: "entry_id,caption_id" }
-        );
 
-      if (error) {
-        console.error("Caption score:", error.message);
-        throw new Error(
-          "Result details saved, but a caption score could not be saved."
-        );
-      }
+      return {
+        caption_id: caption.id,
+        score: value,
+      };
     }
-  }
-
-  revalidatePath(
-    `/staff/competitions/${competitionId}/rounds/${roundId}`
   );
 
-  redirect(resultsUrl(competitionId, roundId, "saved"));
+  // All result fields and caption scores are saved
+  // inside one database transaction.
+  const { error } = await supabase.rpc(
+    "save_round_entry_result",
+    {
+      p_entry_id: entryId,
+      p_round_id: roundId,
+      p_classification: classification,
+      p_total_score: totalScore,
+      p_class_placement: classPlacement,
+      p_overall_placement: overallPlacement,
+      p_notes: notes || null,
+      p_caption_scores: captionScores,
+    }
+  );
+
+  if (error) {
+    console.error("Save result:", error.message);
+    throw new Error(
+      "The result could not be saved. No partial changes were committed."
+    );
+  }
+
+  refresh(competitionId, roundId);
+
+  redirect(
+    returnUrl(
+      competitionId,
+      roundId,
+      "saved",
+      `entry-${entryId}`
+    )
+  );
 }
