@@ -4,13 +4,9 @@ import {
   type BandKind,
 } from "@/lib/band-validation";
 
-import {
-  BAND_STATUSES,
-} from "@/components/BandStatusBadge";
-
-import {
-  createBandSlug,
-} from "@/lib/band-slugs";
+import { BAND_STATUSES } from "@/components/BandStatusBadge";
+import { createBandSlug } from "@/lib/band-slugs";
+import BandCreationLogoField from "@/components/BandCreationLogoField";
 
 export type BandFormValues = {
   id?: string;
@@ -39,6 +35,7 @@ export default function BandForm({
   return (
     <form
       action={action}
+      encType="multipart/form-data"
       className="space-y-6 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm md:p-8"
     >
       {band?.id && (
@@ -70,9 +67,7 @@ export default function BandForm({
           <select
             name="kind"
             required
-            defaultValue={
-              band?.kind ?? "marching_band"
-            }
+            defaultValue={band?.kind ?? "marching_band"}
             className={inputClass}
           >
             {BAND_KINDS.map((kind) => (
@@ -93,9 +88,7 @@ export default function BandForm({
             name="country"
             required
             maxLength={120}
-            defaultValue={
-              band?.country ?? "United States"
-            }
+            defaultValue={band?.country ?? "United States"}
             className={inputClass}
           />
         </label>
@@ -129,9 +122,7 @@ export default function BandForm({
         <select
           name="competitive_status"
           required
-          defaultValue={
-            band?.competitive_status ?? "unknown"
-          }
+          defaultValue={band?.competitive_status ?? "unknown"}
           className={inputClass}
         >
           {BAND_STATUSES.map((status) => (
@@ -162,8 +153,8 @@ export default function BandForm({
             </p>
 
             <p className="mt-2 text-xs text-slate-600">
-              Changing the band name will not
-              change its public URL.
+              Changing the band name will not change
+              its public URL.
             </p>
           </>
         ) : (
@@ -193,6 +184,9 @@ export default function BandForm({
         )}
       </div>
 
+      {/* Only show logo selection during creation. */}
+      {!band?.id && <BandCreationLogoField />}
+
       <label className="block text-sm font-semibold text-[#002144]">
         Historical Information / Notes
 
@@ -206,10 +200,17 @@ export default function BandForm({
         />
       </label>
 
-      <div className="flex justify-end">
+      <div className="flex flex-wrap items-center justify-between gap-4 border-t border-slate-100 pt-6">
+        <p className="text-xs leading-6 text-slate-500">
+          Required fields are marked with *.
+          {band?.id
+            ? " Logo changes are managed separately."
+            : " The logo is optional and can be changed later."}
+        </p>
+
         <button
           type="submit"
-          className="rounded-lg bg-[#861F41] px-6 py-3 text-sm font-bold text-white hover:bg-[#701832]"
+          className="cursor-pointer rounded-lg bg-[#861F41] px-7 py-3 text-sm font-bold text-white transition hover:bg-[#701832]"
         >
           {band ? "Save Band Changes" : "Create Band"}
         </button>

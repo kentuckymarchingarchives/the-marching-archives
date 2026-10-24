@@ -20,13 +20,15 @@ async function DashboardContent() {
     redirect("/staff/login");
   }
 
-  const { data: staff } = await supabase
-    .from("staff_members")
-    .select("role, status")
-    .eq("user_id", userId)
-    .maybeSingle();
+  const { data: staff, error: staffError } =
+    await supabase
+      .from("staff_members")
+      .select("role, status")
+      .eq("user_id", userId)
+      .maybeSingle();
 
   if (
+    staffError ||
     staff?.status !== "active" ||
     !["owner", "admin", "editor"].includes(staff.role)
   ) {
@@ -40,11 +42,26 @@ async function DashboardContent() {
         ? "Administrator"
         : "Editor";
 
+  const canPublish =
+    staff.role === "owner" ||
+    staff.role === "admin";
+
+  const { data: recentCompetitions, error: recentError } =
+    await supabase
+      .from("competitions")
+      .select(
+        "id, name, organization_code, season_year, publication_status"
+      )
+      .is("archived_at", null)
+      .order("season_year", { ascending: false })
+      .order("name", { ascending: true })
+      .limit(8);
+
   const sections = [
     {
       title: "Band Management",
       description:
-        "Create and edit marching bands, drum corps, historical names, and competitive status.",
+        "Create ensemble profiles, upload logos, manage historical names, and update competitive status.",
       href: "/staff/bands",
       createHref: "/staff/bands/new",
       createLabel: "Add Band",
@@ -52,7 +69,7 @@ async function DashboardContent() {
     {
       title: "Competition Management",
       description:
-        "Create events, configure championship stages, and manage competition rounds.",
+        "Create events, configure rounds, enter scores, and manage competition records.",
       href: "/staff/competitions",
       createHref: "/staff/competitions/new",
       createLabel: "Add Competition",
@@ -80,7 +97,7 @@ async function DashboardContent() {
           <form action={signOutStaff}>
             <button
               type="submit"
-              className="rounded-lg border border-white/30 px-5 py-3 text-sm font-semibold hover:bg-white/10"
+              className="cursor-pointer rounded-lg border border-white/30 px-5 py-3 text-sm font-semibold hover:bg-white/10"
             >
               Sign Out
             </button>
@@ -109,16 +126,22 @@ async function DashboardContent() {
           </div>
         </section>
 
-        <section>
-          <h2 className="mb-5 text-2xl font-bold text-[#002144]">
-            Archive Management
-          </h2>
+        <section className="space-y-5">
+          <div>
+            <p className="text-xs font-bold uppercase tracking-widest text-[#861F41]">
+              Staff Tools
+            </p>
+
+            <h2 className="mt-2 text-2xl font-bold text-[#002144]">
+              Archive Management
+            </h2>
+          </div>
 
           <div className="grid gap-5 md:grid-cols-3">
             {sections.map((section) => (
               <div
                 key={section.href}
-                className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm"
+                className="flex flex-col rounded-2xl border border-slate-200 bg-white p-6 shadow-sm"
               >
                 <p className="text-xs font-bold uppercase tracking-widest text-[#861F41]">
                   Available
@@ -128,21 +151,21 @@ async function DashboardContent() {
                   {section.title}
                 </h3>
 
-                <p className="mt-3 min-h-24 text-sm leading-6 text-slate-600">
+                <p className="mt-3 flex-1 text-sm leading-7 text-slate-600">
                   {section.description}
                 </p>
 
                 <div className="mt-6 flex flex-col gap-3">
                   <Link
                     href={section.href}
-                    className="rounded-lg bg-[#002144] px-5 py-3 text-center text-sm font-bold text-white hover:bg-[#123B63]"
+                    className="cursor-pointer rounded-lg bg-[#002144] px-5 py-3 text-center text-sm font-bold text-white hover:bg-[#123B63]"
                   >
-                    Manage →
+                    Manage &rarr;
                   </Link>
 
                   <Link
                     href={section.createHref}
-                    className="rounded-lg bg-[#861F41] px-5 py-3 text-center text-sm font-bold text-white hover:bg-[#A02B52]"
+                    className="cursor-pointer rounded-lg bg-[#861F41] px-5 py-3 text-center text-sm font-bold text-white hover:bg-[#A02B52]"
                   >
                     + {section.createLabel}
                   </Link>
@@ -150,22 +173,156 @@ async function DashboardContent() {
               </div>
             ))}
 
-            <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-              <p className="text-xs font-bold uppercase tracking-widest text-slate-500">
-                Coming in Phase 6
+            <div className="flex flex-col rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+              <p className="text-xs font-bold uppercase tracking-widest text-emerald-700">
+                Available Now
               </p>
 
               <h3 className="mt-3 text-xl font-bold text-[#002144]">
-                Results & Publishing
+                Results &amp; Publishing
               </h3>
 
-              <p className="mt-3 text-sm leading-6 text-slate-600">
-                Enter competing bands, classifications,
-                placements, caption scores, and review
-                completed historical results.
+              <p className="mt-3 flex-1 text-sm leading-7 text-slate-600">
+                Review historical scores, resolve issues,
+                approve verified records, and publish
+                competitions to the public archive.
               </p>
+
+              <div className="mt-6 flex flex-col gap-3">
+                <a
+                  href="#recent-competitions"
+                  className="cursor-pointer rounded-lg bg-[#002144] px-5 py-3 text-center text-sm font-bold text-white hover:bg-[#123B63]"
+                >
+                  Review Competitions &rarr;
+                </a>
+
+                <Link
+                  href="/staff/competitions"
+                  className="cursor-pointer rounded-lg bg-[#861F41] px-5 py-3 text-center text-sm font-bold text-white hover:bg-[#A02B52]"
+                >
+                  All Competitions
+                </Link>
+              </div>
             </div>
           </div>
+        </section>
+
+        <section
+          id="recent-competitions"
+          className="scroll-mt-8 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm md:p-7"
+        >
+          <div className="flex flex-wrap items-start justify-between gap-4">
+            <div>
+              <p className="text-xs font-bold uppercase tracking-widest text-[#861F41]">
+                Results Workflow
+              </p>
+
+              <h2 className="mt-2 text-2xl font-bold text-[#002144]">
+                Recent Competitions
+              </h2>
+
+              <p className="mt-2 text-sm leading-6 text-slate-600">
+                Open an event to review its results and
+                continue the publishing process.
+              </p>
+            </div>
+
+            <Link
+              href="/staff/competitions"
+              className="text-sm font-bold text-[#861F41] hover:underline"
+            >
+              View All &rarr;
+            </Link>
+          </div>
+
+          {recentError ? (
+            <p
+              role="alert"
+              className="mt-6 rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-800"
+            >
+              Unable to load recent competitions.
+            </p>
+          ) : recentCompetitions?.length ? (
+            <div className="mt-6 divide-y divide-slate-100">
+              {recentCompetitions.map((competition) => {
+                const published =
+                  competition.publication_status === "published";
+
+                return (
+                  <div
+                    key={competition.id}
+                    className="flex flex-wrap items-center justify-between gap-4 py-5 first:pt-0 last:pb-0"
+                  >
+                    <div className="min-w-0">
+                      <p className="font-bold text-[#002144]">
+                        {competition.name}
+                      </p>
+
+                      <p className="mt-1 text-sm text-slate-500">
+                        {competition.organization_code}
+                        {" · "}
+                        {competition.season_year}
+                      </p>
+
+                      <span
+                        className={`mt-2 inline-block rounded-full px-3 py-1 text-xs font-bold ${
+                          published
+                            ? "bg-emerald-100 text-emerald-900"
+                            : "bg-amber-100 text-amber-900"
+                        }`}
+                      >
+                        {published ? "Published" : "Draft"}
+                      </span>
+                    </div>
+
+                    <div className="flex flex-wrap gap-2">
+                      <Link
+                        href={`/staff/competitions/${competition.id}`}
+                        className="cursor-pointer rounded-lg border border-slate-300 px-4 py-2 text-sm font-bold text-[#002144] hover:bg-slate-50"
+                      >
+                        Manage Results
+                      </Link>
+
+                      <Link
+                        href={`/staff/competitions/${competition.id}/publish`}
+                        className="cursor-pointer rounded-lg bg-[#861F41] px-4 py-2 text-sm font-bold text-white hover:bg-[#A02B52]"
+                      >
+                        {published
+                          ? "View Publication"
+                          : "Review & Publish"}
+                      </Link>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          ) : (
+            <div className="mt-6 rounded-xl bg-[#F8FAFC] p-7 text-center">
+              <p className="font-semibold text-[#002144]">
+                No competitions yet
+              </p>
+
+              <p className="mt-2 text-sm text-slate-600">
+                Create a competition to begin recording
+                and reviewing historical results.
+              </p>
+
+              <Link
+                href="/staff/competitions/new"
+                className="mt-4 inline-block font-bold text-[#861F41] hover:underline"
+              >
+                Create Competition &rarr;
+              </Link>
+            </div>
+          )}
+
+          {!canPublish && (
+            <p className="mt-6 border-t border-slate-100 pt-4 text-xs leading-6 text-slate-500">
+              Editors can enter and review competition
+              results. Only Owners and Administrators
+              can approve or publish them.
+            </p>
+          )}
         </section>
 
         <section className="rounded-2xl border border-slate-200 bg-white p-6">
@@ -174,16 +331,24 @@ async function DashboardContent() {
           </h2>
 
           <p className="mt-2 text-sm text-slate-600">
-            See the published band and corps directory
-            as visitors see it.
+            Explore the published archive as visitors see it.
           </p>
 
-          <Link
-            href="/bands"
-            className="mt-4 inline-block text-sm font-bold text-[#861F41]"
-          >
-            View Band Directory →
-          </Link>
+          <div className="mt-4 flex flex-wrap gap-5">
+            <Link
+              href="/bands"
+              className="font-bold text-[#861F41] hover:underline"
+            >
+              Band Directory &rarr;
+            </Link>
+
+            <Link
+              href="/competitions"
+              className="font-bold text-[#861F41] hover:underline"
+            >
+              Competition Archive &rarr;
+            </Link>
+          </div>
         </section>
       </div>
     </main>
