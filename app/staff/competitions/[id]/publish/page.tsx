@@ -5,6 +5,7 @@ import { notFound, redirect } from "next/navigation";
 
 import { createClient } from "@/lib/supabase/server";
 import { UUID_PATTERN } from "@/lib/band-validation";
+import StaffActionButton from "@/components/StaffActionButton";
 
 import {
   analyzeCompetition,
@@ -30,69 +31,101 @@ type Props = {
   searchParams: Promise<{ message?: string }>;
 };
 
-const notices: Record<string, string> = {
-  approved: "Review approval recorded successfully.",
-  published: "Competition published successfully.",
+const messages: Record<string, string> = {
+  approved:
+    "Historical review approved. You can now proceed to publishing.",
+  published:
+    "Success! This competition is published in The Marching Archives.",
   unpublished:
-    "Competition returned to Draft. A new approval will be required.",
+    "Competition returned to Draft. Its previous approval has been cleared.",
 };
 
-function FindingCard({
+function ReviewFindingCard({
   finding,
   competitionId,
 }: {
   finding: ReviewFinding;
   competitionId: string;
 }) {
-  const style =
-    finding.severity === "critical"
-      ? {
-          border: "border-red-200",
-          background: "bg-red-50",
-          text: "text-red-900",
-          label: "Critical Issue",
-        }
-      : finding.severity === "warning"
-        ? {
-            border: "border-amber-200",
-            background: "bg-amber-50",
-            text: "text-amber-900",
-            label: "Review Warning",
-          }
-        : {
-            border: "border-emerald-200",
-            background: "bg-emerald-50",
-            text: "text-emerald-900",
-            label: "Passed",
-          };
+  const critical = finding.severity === "critical";
+  const warning = finding.severity === "warning";
+
+  const classes = critical
+    ? "border-red-200 bg-red-50 text-red-900"
+    : warning
+      ? "border-amber-200 bg-amber-50 text-amber-900"
+      : "border-emerald-200 bg-emerald-50 text-emerald-900";
 
   return (
-    <article
-      className={`rounded-xl border p-5 ${style.border} ${style.background}`}
-    >
-      <p
-        className={`text-xs font-bold uppercase tracking-wider ${style.text}`}
-      >
-        {style.label}
-      </p>
-
-      <h3 className={`mt-2 font-bold ${style.text}`}>
-        {finding.title}
-      </h3>
-
-      <p className={`mt-2 text-sm leading-6 ${style.text}`}>
-        {finding.detail}
-      </p>
-
-      {finding.roundId && (
-        <Link
-          href={`/staff/competitions/${competitionId}/rounds/${finding.roundId}`}
-          className={`mt-4 inline-flex cursor-pointer rounded-lg border ${style.border} bg-white px-4 py-2 text-sm font-bold ${style.text} hover:underline`}
+    <div className={`rounded-xl border p-5 ${classes}`}>
+      <div className="flex items-start gap-3">
+        <span
+          aria-hidden="true"
+          className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-current/20 bg-white font-bold"
         >
-          Open Round to Fix &rarr;
-        </Link>
-      )}
-    </article>
+          {critical ? "!" : warning ? "?" : "✓"}
+        </span>
+
+        <div className="min-w-0 flex-1">
+          <h3 className="font-bold">
+            {finding.title}
+          </h3>
+
+          <p className="mt-2 text-sm leading-6">
+            {finding.detail}
+          </p>
+
+          {finding.roundId && (
+            <Link
+              href={`/staff/competitions/${competitionId}/rounds/${finding.roundId}`}
+              className="mt-4 inline-flex cursor-pointer rounded-lg border border-current/20 bg-white px-4 py-2 text-sm font-bold hover:underline"
+            >
+              Open Round to Fix &rarr;
+            </Link>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function WorkflowStep({
+  number,
+  title,
+  status,
+  href,
+  complete,
+}: {
+  number: number;
+  title: string;
+  status: string;
+  href: string;
+  complete: boolean;
+}) {
+  return (
+    <a
+      href={href}
+      className="group flex cursor-pointer items-start gap-3 rounded-xl border border-slate-200 bg-white p-4 transition hover:border-[#861F41]"
+    >
+      <span
+        className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-sm font-bold ${
+          complete
+            ? "bg-emerald-100 text-emerald-800"
+            : "bg-[#F4F6F9] text-[#002144]"
+        }`}
+      >
+        {complete ? "✓" : number}
+      </span>
+
+      <span className="min-w-0">
+        <span className="block font-bold text-[#002144] group-hover:text-[#861F41]">
+          {title}
+        </span>
+        <span className="mt-1 block text-xs leading-5 text-slate-600">
+          {status}
+        </span>
+      </span>
+    </a>
   );
 }
 
@@ -131,119 +164,117 @@ async function PublishingContent({
     redirect("/staff/login?error=unauthorized");
   }
 
-  const { data: competitionData, error: competitionError } =
-    await supabase
+  const [
+    competitionResult,
+    approvalResult,
+    roundsResult,
+  ] = await Promise.all([
+    supabase
       .from("competitions")
       .select(
         "id, name, season_year, organization_code, competition_date, source_url, publication_status, archived_at"
       )
       .eq("id", id)
-      .maybeSingle();
+      .maybeSingle(),
 
-  if (competitionError) {
-    throw new Error("Unable to load competition.");
-  }
-
-  if (!competitionData) {
-    notFound();
-  }
-
-  const competition = competitionData as ReviewCompetition;
-
-  const { data: approval, error: approvalError } =
-    await supabase
+    supabase
       .from("competition_approvals")
       .select("approved_by, approved_at, review_notes")
       .eq("competition_id", id)
-      .maybeSingle();
+      .maybeSingle(),
 
-  if (approvalError) {
-    throw new Error("Unable to load review approval.");
+    supabase
+      .from("competition_rounds")
+      .select(
+        "id, name, class_scope, archived_at",
+        { count: "exact" }
+      )
+      .eq("competition_id", id)
+      .order("sort_order", { ascending: true })
+      .limit(100),
+  ]);
+
+  if (
+    competitionResult.error ||
+    approvalResult.error ||
+    roundsResult.error
+  ) {
+    throw new Error(
+      "Unable to load the competition publishing workflow."
+    );
   }
 
-  // Load the same information used by the existing
-  // Phase 7.1 review page.
-  const {
-    data: roundData,
-    count: roundCount,
-    error: roundError,
-  } = await supabase
-    .from("competition_rounds")
-    .select(
-      "id, name, class_scope, archived_at",
-      { count: "exact" }
-    )
-    .eq("competition_id", id)
-    .order("sort_order", { ascending: true })
-    .limit(100);
-
-  if (roundError) {
-    throw new Error("Unable to load competition rounds.");
+  if (!competitionResult.data) {
+    notFound();
   }
 
-  const rounds = (roundData ?? []) as ReviewRound[];
+  const competition =
+    competitionResult.data as ReviewCompetition;
+
+  const approval = approvalResult.data;
+  const rounds = (roundsResult.data ?? []) as ReviewRound[];
   const roundIds = rounds.map((round) => round.id);
 
   let entries: ReviewEntry[] = [];
   let captions: ReviewCaption[] = [];
   let captionScores: ReviewCaptionScore[] = [];
   let bands: ReviewBand[] = [];
-  let truncated = (roundCount ?? 0) > rounds.length;
+
+  let truncated =
+    (roundsResult.count ?? 0) > rounds.length;
 
   if (roundIds.length > 0) {
-    const [entryResult, captionResult] = await Promise.all([
-      supabase
-        .from("competition_entries")
-        .select(
-          "id, band_id, round_id, classification, total_score, class_placement, overall_placement",
-          { count: "exact" }
-        )
-        .in("round_id", roundIds)
-        .limit(1000),
+    const [entriesResult, captionsResult] =
+      await Promise.all([
+        supabase
+          .from("competition_entries")
+          .select(
+            "id, band_id, round_id, classification, total_score, class_placement, overall_placement",
+            { count: "exact" }
+          )
+          .in("round_id", roundIds)
+          .limit(1000),
 
-      supabase
-        .from("score_captions")
-        .select("id, round_id, name, max_score", {
-          count: "exact",
-        })
-        .in("round_id", roundIds)
-        .limit(1000),
-    ]);
+        supabase
+          .from("score_captions")
+          .select(
+            "id, round_id, name, max_score",
+            { count: "exact" }
+          )
+          .in("round_id", roundIds)
+          .limit(1000),
+      ]);
 
-    if (entryResult.error || captionResult.error) {
-      throw new Error(
-        "Unable to load competition results."
-      );
+    if (entriesResult.error || captionsResult.error) {
+      throw new Error("Unable to review competition results.");
     }
 
-    entries = (entryResult.data ?? []) as ReviewEntry[];
-    captions = (captionResult.data ?? []) as ReviewCaption[];
+    entries = (entriesResult.data ?? []) as ReviewEntry[];
+    captions =
+      (captionsResult.data ?? []) as ReviewCaption[];
 
     if (
-      (entryResult.count ?? 0) > entries.length ||
-      (captionResult.count ?? 0) > captions.length
+      (entriesResult.count ?? 0) > entries.length ||
+      (captionsResult.count ?? 0) > captions.length
     ) {
       truncated = true;
     }
   }
 
+  const entryIds = entries.map((entry) => entry.id);
   const bandIds = [
     ...new Set(entries.map((entry) => entry.band_id)),
   ];
 
-  const entryIds = entries.map((entry) => entry.id);
-
   if (bandIds.length > 0) {
     const { data, count, error } = await supabase
       .from("bands")
-      .select("id, name, archived_at", {
-        count: "exact",
-      })
+      .select("id, name, archived_at", { count: "exact" })
       .in("id", bandIds)
       .limit(1000);
 
     if (error) {
-      throw new Error("Unable to load ensemble records.");
+      throw new Error("Unable to review ensemble records.");
     }
 
     bands = (data ?? []) as ReviewBand[];
@@ -263,10 +294,11 @@ async function PublishingContent({
       .limit(1000);
 
     if (error) {
-      throw new Error("Unable to load caption scores.");
+      throw new Error("Unable to review caption scores.");
     }
 
-    captionScores = (data ?? []) as ReviewCaptionScore[];
+    captionScores =
+      (data ?? []) as ReviewCaptionScore[];
 
     if ((count ?? 0) > captionScores.length) {
       truncated = true;
@@ -304,28 +336,41 @@ async function PublishingContent({
 
   const archived = Boolean(competition.archived_at);
 
-  const canProceed =
+  const reviewReady =
     critical.length === 0 &&
     !truncated &&
     !archived;
 
+  const hasApproval = Boolean(approval);
+
   const successMessage =
-    message && notices[message]
-      ? notices[message]
+    message && Object.hasOwn(messages, message)
+      ? messages[message]
       : null;
 
-  const activeRounds = rounds.filter(
+  const activeRoundCount = rounds.filter(
     (round) => !round.archived_at
   ).length;
 
-  const sourceUrl =
-    competition.source_url &&
-    /^https?:\/\//i.test(competition.source_url)
-      ? competition.source_url
-      : null;
+  let sourceUrl: string | null = null;
+
+  if (competition.source_url) {
+    try {
+      const parsed = new URL(competition.source_url);
+
+      if (
+        parsed.protocol === "https:" ||
+        parsed.protocol === "http:"
+      ) {
+        sourceUrl = parsed.toString();
+      }
+    } catch {
+      sourceUrl = null;
+    }
+  }
 
   return (
-    <div className="mx-auto max-w-6xl space-y-9 px-6 py-10">
+    <div className="mx-auto max-w-6xl space-y-8 px-6 py-10">
       <Link
         href={`/staff/competitions/${id}`}
         className="text-sm font-semibold text-[#861F41] hover:underline"
@@ -333,138 +378,143 @@ async function PublishingContent({
         &larr; Competition Management
       </Link>
 
-      <header>
+      <header className="space-y-3">
         <p className="text-xs font-bold uppercase tracking-widest text-[#861F41]">
-          Administration · Quality Control
+          Staff Administration
         </p>
 
-        <h1 className="mt-3 font-serif text-4xl font-bold text-[#002144]">
+        <h1 className="font-serif text-4xl font-bold text-[#002144]">
           Review &amp; Publish
         </h1>
 
-        <p className="mt-3 text-xl font-semibold text-[#002144]">
+        <p className="text-xl font-bold text-[#002144]">
           {competition.name}
         </p>
 
-        <p className="mt-2 text-slate-600">
-          {competition.organization_code}
-          {" · "}
-          {competition.season_year}
-        </p>
+        <div className="flex flex-wrap items-center gap-3">
+          <span className="text-sm text-slate-600">
+            {competition.organization_code}
+            {" · "}
+            {competition.season_year}
+          </span>
+
+          <span
+            className={`rounded-full px-3 py-1 text-xs font-bold ${
+              published
+                ? "bg-emerald-100 text-emerald-900"
+                : "bg-amber-100 text-amber-900"
+            }`}
+          >
+            {published ? "Published" : "Draft"}
+          </span>
+        </div>
       </header>
 
       {successMessage && (
         <div
+          id="workflow-message"
           role="status"
-          className="rounded-xl border border-emerald-200 bg-emerald-50 p-5 text-sm font-bold text-emerald-900"
+          className="scroll-mt-24 rounded-xl border border-emerald-200 bg-emerald-50 p-5 text-sm font-bold text-emerald-900"
         >
           {successMessage}
         </div>
       )}
 
       {archived && (
-        <div
+        <p
           role="alert"
           className="rounded-xl border border-red-200 bg-red-50 p-5 text-sm text-red-900"
         >
           This competition is archived. Restore it
-          before approving or publishing its results.
-        </div>
+          before approving or publishing results.
+        </p>
       )}
 
-      {/* Summary */}
-      <section className="grid gap-4 sm:grid-cols-4">
+      <nav
+        aria-label="Publishing workflow sections"
+        className="grid gap-3 md:grid-cols-3"
+      >
+        <WorkflowStep
+          number={1}
+          title="Review Results"
+          status={
+            reviewReady
+              ? "Automated checks ready"
+              : `${critical.length} critical issues; review required`
+          }
+          complete={reviewReady}
+          href="#review"
+        />
+
+        <WorkflowStep
+          number={2}
+          title="Approve Results"
+          status={
+            hasApproval
+              ? "Approval recorded"
+              : "Source verification required"
+          }
+          complete={hasApproval}
+          href="#approval"
+        />
+
+        <WorkflowStep
+          number={3}
+          title="Publish"
+          status={
+            published
+              ? "Visible in public archive"
+              : "Awaiting publication"
+          }
+          complete={published}
+          href="#publication"
+        />
+      </nav>
+
+      <section className="grid gap-3 sm:grid-cols-4">
         {[
           {
             label: "Critical Issues",
             value: critical.length,
-            style: "text-red-800 bg-red-50",
+            color: "text-red-800",
           },
           {
             label: "Warnings",
             value: warnings.length,
-            style: "text-amber-800 bg-amber-50",
+            color: "text-amber-800",
           },
           {
             label: "Passed Checks",
             value: passed.length,
-            style: "text-emerald-800 bg-emerald-50",
+            color: "text-emerald-800",
           },
           {
             label: "Active Rounds",
-            value: activeRounds,
-            style: "text-[#002144] bg-white",
+            value: activeRoundCount,
+            color: "text-[#002144]",
           },
         ].map((item) => (
           <div
             key={item.label}
-            className={`rounded-2xl border border-slate-200 p-5 ${item.style}`}
+            className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm"
           >
-            <p className="text-xs font-bold uppercase tracking-wide">
+            <p className="text-xs font-bold uppercase tracking-wide text-slate-500">
               {item.label}
             </p>
-
-            <p className="mt-3 text-3xl font-bold tabular-nums">
+            <p
+              className={`mt-3 text-3xl font-bold tabular-nums ${item.color}`}
+            >
               {item.value}
             </p>
           </div>
         ))}
       </section>
 
-      {/* Progress indicator */}
-      <section className="rounded-2xl border border-slate-200 bg-white p-7">
-        <h2 className="text-2xl font-bold text-[#002144]">
-          Publishing Progress
-        </h2>
-
-        <div className="mt-5 grid gap-4 md:grid-cols-3">
-          <div className="rounded-xl border border-slate-200 p-5">
-            <p className="text-sm font-bold text-[#002144]">
-              1. Results Review
-            </p>
-            <p
-              className={`mt-2 text-sm font-semibold ${
-                canProceed
-                  ? "text-emerald-700"
-                  : "text-amber-800"
-              }`}
-            >
-              {canProceed
-                ? "Automated checks complete"
-                : "Needs attention"}
-            </p>
-          </div>
-
-          <div className="rounded-xl border border-slate-200 p-5">
-            <p className="text-sm font-bold text-[#002144]">
-              2. Historical Approval
-            </p>
-            <p className="mt-2 text-sm font-semibold text-slate-600">
-              {approval
-                ? "Approval recorded"
-                : "Awaiting Owner/Admin approval"}
-            </p>
-          </div>
-
-          <div className="rounded-xl border border-slate-200 p-5">
-            <p className="text-sm font-bold text-[#002144]">
-              3. Publication
-            </p>
-            <p className="mt-2 text-sm font-semibold text-slate-600">
-              {published
-                ? "Published to the public archive"
-                : "Not yet published"}
-            </p>
-          </div>
-        </div>
-      </section>
-
-      {/* Automated review */}
       <section
         id="review"
-        className="scroll-mt-8 space-y-6 rounded-2xl border border-slate-200 bg-white p-7"
+        className="scroll-mt-8 space-y-5 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm md:p-8"
       >
-        <div className="flex flex-wrap items-start justify-between gap-4">
+        <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
             <p className="text-xs font-bold uppercase tracking-widest text-[#861F41]">
               Step 1
@@ -475,17 +525,17 @@ async function PublishingContent({
             </h2>
 
             <p className="mt-3 text-sm leading-7 text-slate-600">
-              TMA checks your entered rounds, ensembles,
-              placements, and scores for potential
-              problems before publication.
+              Automated checks help identify incomplete
+              records, inconsistent placements, and other
+              potential problems.
             </p>
           </div>
 
           <Link
-            href={`/staff/competitions/${id}/publish`}
-            className="cursor-pointer rounded-lg border border-slate-300 px-5 py-3 text-sm font-bold text-[#002144] hover:bg-slate-50"
+            href={`/staff/competitions/${id}/publish#review`}
+            className="cursor-pointer rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-bold text-[#002144] hover:bg-slate-50"
           >
-            Run Review Again
+            Refresh Review
           </Link>
         </div>
 
@@ -496,11 +546,11 @@ async function PublishingContent({
         ) : (
           <div className="space-y-3">
             <h3 className="font-bold text-red-900">
-              Issues to Resolve ({critical.length})
+              Issues to Fix ({critical.length})
             </h3>
 
             {critical.map((finding, index) => (
-              <FindingCard
+              <ReviewFindingCard
                 key={`critical-${index}`}
                 finding={finding}
                 competitionId={id}
@@ -509,15 +559,26 @@ async function PublishingContent({
           </div>
         )}
 
+        {truncated && (
+          <p
+            role="alert"
+            className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-900"
+          >
+            Some records exceed the review limits.
+            The full competition must be checked before
+            it can be safely approved.
+          </p>
+        )}
+
         {warnings.length > 0 && (
-          <details className="rounded-xl border border-amber-200 bg-amber-50">
-            <summary className="cursor-pointer p-5 font-bold text-amber-900">
-              Review Warnings ({warnings.length})
+          <details className="rounded-xl border border-amber-200">
+            <summary className="cursor-pointer bg-amber-50 p-5 font-bold text-amber-900">
+              Warnings ({warnings.length})
             </summary>
 
-            <div className="space-y-3 border-t border-amber-200 p-4">
+            <div className="space-y-3 p-4">
               {warnings.map((finding, index) => (
-                <FindingCard
+                <ReviewFindingCard
                   key={`warning-${index}`}
                   finding={finding}
                   competitionId={id}
@@ -528,14 +589,14 @@ async function PublishingContent({
         )}
 
         {passed.length > 0 && (
-          <details className="rounded-xl border border-emerald-200 bg-emerald-50">
-            <summary className="cursor-pointer p-5 font-bold text-emerald-900">
+          <details className="rounded-xl border border-emerald-200">
+            <summary className="cursor-pointer bg-emerald-50 p-5 font-bold text-emerald-900">
               Passed Checks ({passed.length})
             </summary>
 
-            <div className="space-y-3 border-t border-emerald-200 p-4">
+            <div className="space-y-3 p-4">
               {passed.map((finding, index) => (
-                <FindingCard
+                <ReviewFindingCard
                   key={`passed-${index}`}
                   finding={finding}
                   competitionId={id}
@@ -545,39 +606,26 @@ async function PublishingContent({
           </details>
         )}
 
-        {truncated && (
-          <p
-            role="alert"
-            className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-900"
-          >
-            This competition has more records than the
-            review can load. Publishing should not
-            proceed until the full record set can
-            be verified.
-          </p>
-        )}
-
         <div className="flex flex-wrap gap-3 border-t border-slate-100 pt-5">
           <Link
             href={`/staff/competitions/${id}`}
             className="cursor-pointer rounded-lg bg-[#002144] px-5 py-3 text-sm font-bold text-white hover:bg-[#123B63]"
           >
-            Edit Competition &rarr;
+            Manage Competition &rarr;
           </Link>
 
           <Link
             href={`/staff/competitions/${id}/review`}
-            className="cursor-pointer rounded-lg border border-slate-300 px-5 py-3 text-sm font-bold text-[#002144] hover:bg-slate-50"
+            className="cursor-pointer rounded-lg border border-slate-300 px-5 py-3 text-sm font-bold text-[#002144]"
           >
-            View Detailed Review
+            Full Review Report
           </Link>
         </div>
       </section>
 
-      {/* Manual verification and approval */}
       <section
         id="approval"
-        className="scroll-mt-8 space-y-5 rounded-2xl border border-slate-200 bg-white p-7"
+        className="scroll-mt-8 space-y-5 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm md:p-8"
       >
         <div>
           <p className="text-xs font-bold uppercase tracking-widest text-[#861F41]">
@@ -585,14 +633,13 @@ async function PublishingContent({
           </p>
 
           <h2 className="mt-2 text-2xl font-bold text-[#002144]">
-            Verify &amp; Approve Results
+            Verify &amp; Approve
           </h2>
 
           <p className="mt-3 text-sm leading-7 text-slate-600">
-            Automated checks don't establish historical
-            accuracy. Compare the results against official
-            recaps, programs, score sheets, or other
-            documented sources before approving.
+            Compare recorded results against the original
+            historical source material. Automated checks
+            alone do not verify historical accuracy.
           </p>
 
           {sourceUrl && (
@@ -602,33 +649,33 @@ async function PublishingContent({
               rel="noopener noreferrer"
               className="mt-4 inline-block font-bold text-[#861F41] hover:underline"
             >
-              Open Recorded Source &nearr;
+              Open Recorded Source ↗
             </a>
           )}
         </div>
 
         <div className="rounded-xl bg-[#F4F6F9] p-5">
-          <p className="text-sm font-bold text-[#002144]">
-            Historical Verification Checklist
+          <p className="font-bold text-[#002144]">
+            Manual Verification Checklist
           </p>
 
           <ul className="mt-3 list-disc space-y-2 pl-5 text-sm leading-6 text-slate-700">
-            <li>Confirm competition date, name, and location.</li>
-            <li>Verify ensembles included in each round.</li>
-            <li>Compare official totals and caption scores.</li>
-            <li>Confirm class and overall placements, including ties.</li>
-            <li>Document exceptions or incomplete source material.</li>
+            <li>Confirm the competition name, date, and location.</li>
+            <li>Verify the competing ensembles and classifications.</li>
+            <li>Compare totals, placements, and caption scores.</li>
+            <li>Identify ties, penalties, and documented exceptions.</li>
+            <li>Record which historical sources were reviewed.</li>
           </ul>
         </div>
 
         {approval && (
           <div className="rounded-xl border border-blue-200 bg-blue-50 p-5">
-            <p className="text-sm font-bold text-blue-900">
-              Approval Recorded
+            <p className="font-bold text-blue-900">
+              Approval on File
             </p>
 
             <p className="mt-2 text-sm text-blue-900">
-              Approved on{" "}
+              Approved{" "}
               {new Date(approval.approved_at).toLocaleString(
                 "en-US",
                 {
@@ -639,31 +686,32 @@ async function PublishingContent({
               )}
             </p>
 
-            <p className="mt-3 whitespace-pre-wrap text-sm leading-6 text-blue-900">
+            <p className="mt-3 whitespace-pre-wrap text-sm leading-7 text-blue-900">
               {approval.review_notes}
             </p>
 
-            <p className="mt-3 text-xs leading-6 text-blue-800">
-              Publishing will independently verify
-              that the approved data has not changed.
+            <p className="mt-3 text-xs text-blue-800">
+              The publishing function will verify that
+              the approved records have not changed.
             </p>
           </div>
         )}
 
         {!canManage ? (
-          <p className="rounded-lg bg-slate-50 p-4 text-sm text-slate-600">
-            Editors may review and correct results, but
-            an Owner or Administrator must approve them.
+          <p className="rounded-xl bg-slate-50 p-5 text-sm text-slate-600">
+            Editors may review and correct results.
+            Only Owners and Administrators can approve them.
           </p>
         ) : published ? (
           <p className="text-sm text-slate-600">
-            This competition is already published.
-            Return it to Draft before recording a new approval.
+            This competition is published. Return it
+            to Draft before making new corrections.
           </p>
-        ) : !canProceed ? (
-          <p className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
-            Resolve critical review problems and restore
-            any archived records before approval.
+        ) : !reviewReady ? (
+          <p className="rounded-xl border border-amber-200 bg-amber-50 p-5 text-sm text-amber-900">
+            Approval is unavailable until critical
+            issues are resolved and the entire record
+            set has been reviewed.
           </p>
         ) : (
           <form
@@ -685,7 +733,7 @@ async function PublishingContent({
                 minLength={10}
                 maxLength={2000}
                 rows={4}
-                placeholder="Describe the historical sources verified, accuracy checks, and any exceptions."
+                placeholder="Describe the source documents checked, accuracy verification, and any exceptions."
                 className="mt-2 w-full rounded-lg border border-slate-300 bg-white px-4 py-3 text-sm text-[#002144]"
               />
             </label>
@@ -700,29 +748,29 @@ async function PublishingContent({
               />
 
               <span>
-                I have manually reviewed the historical
-                sources and verified the competition
-                information. My approval will be recorded
-                under my staff account.
+                I have manually verified the historical
+                results against the available source material.
+                This approval will be recorded under my
+                staff account.
               </span>
             </label>
 
-            <button
-              type="submit"
-              className="cursor-pointer rounded-lg bg-[#002144] px-6 py-3 text-sm font-bold text-white hover:bg-[#123B63]"
-            >
-              {approval
-                ? "Approve Reviewed Results Again"
-                : "Approve Reviewed Results"}
-            </button>
+            <StaffActionButton
+              label={
+                approval
+                  ? "Approve Again"
+                  : "Approve Reviewed Results"
+              }
+              pendingLabel="Approving..."
+              variant="navy"
+            />
           </form>
         )}
       </section>
 
-      {/* Publication */}
       <section
         id="publication"
-        className="scroll-mt-8 space-y-5 rounded-2xl border border-slate-200 bg-white p-7"
+        className="scroll-mt-8 space-y-5 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm md:p-8"
       >
         <div>
           <p className="text-xs font-bold uppercase tracking-widest text-[#861F41]">
@@ -730,13 +778,13 @@ async function PublishingContent({
           </p>
 
           <h2 className="mt-2 text-2xl font-bold text-[#002144]">
-            Publish to The Marching Archives
+            Publish Results
           </h2>
 
           <p className="mt-3 text-sm leading-7 text-slate-600">
-            Publishing makes the non-archived rounds
-            and historical results available through
-            the public competition archive.
+            Publishing makes the competition's
+            non-archived rounds and verified results
+            available in the public archive.
           </p>
         </div>
 
@@ -750,17 +798,17 @@ async function PublishingContent({
           </p>
         ) : !canManage ? (
           <p className="text-sm text-slate-600">
-            Publishing requires an Owner or Administrator.
+            Publishing is restricted to Owners and
+            Administrators.
           </p>
-        ) : !canProceed ? (
+        ) : !reviewReady ? (
           <p className="rounded-xl border border-amber-200 bg-amber-50 p-5 text-sm text-amber-900">
-            Resolve the review issues above before
-            proceeding with publication.
+            Resolve review problems before publishing.
           </p>
         ) : !approval ? (
           <p className="rounded-xl border border-amber-200 bg-amber-50 p-5 text-sm text-amber-900">
-            Record a verified historical approval
-            in Step 2 before publishing.
+            An approved historical review is required
+            before publication.
           </p>
         ) : (
           <form
@@ -783,34 +831,34 @@ async function PublishingContent({
               />
 
               <span>
-                I understand that publishing makes
-                these verified results publicly
-                accessible and that changes require
-                unpublishing and a new approval.
+                I understand that these results will
+                become publicly accessible. Corrections
+                will require unpublishing and a new approval.
               </span>
             </label>
 
-            <button
-              type="submit"
-              className="cursor-pointer rounded-lg bg-emerald-700 px-6 py-3 text-sm font-bold text-white hover:bg-emerald-800"
-            >
-              Publish Competition
-            </button>
+            <StaffActionButton
+              label="Publish Competition"
+              pendingLabel="Publishing..."
+              variant="green"
+            />
           </form>
         )}
       </section>
 
-      {/* Unpublish */}
       {published && canManage && (
-        <section className="space-y-5 rounded-2xl border border-red-200 bg-white p-7">
+        <section
+          id="unpublish"
+          className="scroll-mt-8 space-y-5 rounded-2xl border border-red-200 bg-white p-6 shadow-sm md:p-8"
+        >
           <h2 className="text-2xl font-bold text-red-900">
-            Return to Draft
+            Return Competition to Draft
           </h2>
 
           <p className="text-sm leading-7 text-slate-600">
-            Unpublishing removes this competition
-            from the public archive while preserving
-            its internal records. The current approval
+            Returning to Draft removes the competition
+            from the public archive without deleting
+            its historical records. The previous approval
             will be cleared.
           </p>
 
@@ -833,26 +881,34 @@ async function PublishingContent({
                 pattern="UNPUBLISH"
                 autoComplete="off"
                 placeholder="UNPUBLISH"
-                className="mt-2 block w-full max-w-sm rounded-lg border border-red-300 bg-white px-4 py-3 text-sm"
+                className="mt-2 block w-full max-w-sm rounded-lg border border-red-300 bg-white px-4 py-3 text-sm text-[#002144]"
               />
             </label>
 
-            <button
-              type="submit"
-              className="cursor-pointer rounded-lg border border-red-300 bg-red-50 px-6 py-3 text-sm font-bold text-red-800 hover:bg-red-100"
-            >
-              Return Competition to Draft
-            </button>
+            <StaffActionButton
+              label="Return to Draft"
+              pendingLabel="Unpublishing..."
+              variant="danger"
+            />
           </form>
         </section>
       )}
 
-      <Link
-        href={`/staff/competitions/${id}`}
-        className="inline-block text-sm font-bold text-[#861F41] hover:underline"
-      >
-        &larr; Return to Competition Management
-      </Link>
+      <div className="flex flex-wrap gap-4">
+        <Link
+          href={`/staff/competitions/${id}`}
+          className="font-bold text-[#861F41] hover:underline"
+        >
+          &larr; Competition Management
+        </Link>
+
+        <Link
+          href="/staff/dashboard"
+          className="font-bold text-[#002144] hover:underline"
+        >
+          Staff Dashboard
+        </Link>
+      </div>
     </div>
   );
 }
@@ -866,7 +922,7 @@ export default function PublishingPage(props: Props) {
             role="status"
             className="mx-auto max-w-6xl px-6 py-10 text-sm text-slate-600"
           >
-            Loading competition review and publishing...
+            Loading review and publishing workflow...
           </div>
         }
       >

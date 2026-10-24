@@ -54,8 +54,9 @@ function competitionId(form: FormData): string {
 
 function finish(
   id: string,
-  message: string
+  message: "approved" | "published" | "unpublished"
 ): never {
+  revalidatePath("/staff/dashboard");
   revalidatePath("/staff/competitions");
   revalidatePath(`/staff/competitions/${id}`);
   revalidatePath(`/staff/competitions/${id}/review`);
@@ -63,30 +64,25 @@ function finish(
   revalidatePath("/competitions");
   revalidatePath("/bands");
 
+  // Reopen the workflow at its confirmation message.
   redirect(
-    `/staff/competitions/${id}/publish?message=${message}`
+    `/staff/competitions/${id}/publish?message=${message}#workflow-message`
   );
 }
 
 export async function approveCompetition(
   form: FormData
-) {
+): Promise<void> {
   const id = competitionId(form);
-
   const notes = read(form, "review_notes");
 
-  if (
-    notes.length < 10 ||
-    notes.length > 2000
-  ) {
+  if (notes.length < 10 || notes.length > 2000) {
     throw new Error(
       "Review notes must be between 10 and 2000 characters."
     );
   }
 
-  if (
-    read(form, "verified") !== "yes"
-  ) {
+  if (read(form, "verified") !== "yes") {
     throw new Error(
       "Confirm that you manually verified the historical results."
     );
@@ -118,7 +114,7 @@ export async function approveCompetition(
 
 export async function publishCompetition(
   form: FormData
-) {
+): Promise<void> {
   const id = competitionId(form);
 
   if (read(form, "confirm_publish") !== "yes") {
@@ -152,12 +148,10 @@ export async function publishCompetition(
 
 export async function unpublishCompetition(
   form: FormData
-) {
+): Promise<void> {
   const id = competitionId(form);
 
-  if (
-    read(form, "confirmation") !== "UNPUBLISH"
-  ) {
+  if (read(form, "confirmation") !== "UNPUBLISH") {
     throw new Error(
       "Type UNPUBLISH to confirm."
     );
