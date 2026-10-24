@@ -12,6 +12,41 @@ type Props = {
   }>;
 };
 
+function BandLogo({
+  name,
+  logoUrl,
+}: {
+  name: string;
+  logoUrl: string | null;
+}) {
+  return (
+    <div className="flex h-20 w-20 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-slate-200 bg-[#F8FAFC] p-2 sm:h-24 sm:w-24">
+      {logoUrl ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          src={logoUrl}
+          alt={`${name} logo`}
+          loading="lazy"
+          className="h-full w-full object-contain"
+        />
+      ) : (
+        <svg
+          viewBox="0 0 48 48"
+          aria-hidden="true"
+          className="h-10 w-10 text-slate-300"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+        >
+          <rect x="5" y="7" width="38" height="34" rx="5" />
+          <circle cx="17" cy="18" r="4" />
+          <path d="m9 35 11-11 7 7 5-5 7 9" />
+        </svg>
+      )}
+    </div>
+  );
+}
+
 async function BandDirectory({
   searchParams,
 }: Props) {
@@ -32,8 +67,9 @@ async function BandDirectory({
   let query = supabase
     .from("bands")
     .select(
-      "id, slug, name, kind, city, state, country, competitive_status"
+      "id, slug, name, kind, city, state, country, competitive_status, logo_path"
     )
+    .is("archived_at", null)
     .order("name", { ascending: true })
     .limit(100);
 
@@ -93,7 +129,7 @@ async function BandDirectory({
 
           <button
             type="submit"
-            className="rounded-lg bg-[#861F41] px-7 py-3 text-sm font-bold text-white hover:bg-[#A02B52]"
+            className="cursor-pointer rounded-lg bg-[#861F41] px-7 py-3 text-sm font-bold text-white transition hover:bg-[#A02B52]"
           >
             Search
           </button>
@@ -122,52 +158,73 @@ async function BandDirectory({
         </div>
       ) : bands?.length ? (
         <div className="grid gap-4 md:grid-cols-2">
-          {bands.map((band) => (
-            <Link
-              key={band.id}
-              href={`/bands/${band.slug}`}
-              className="group rounded-2xl border border-slate-200 bg-white p-6 shadow-sm transition hover:border-[#861F41] hover:shadow-md"
-            >
-              <div className="flex items-start justify-between gap-4">
-                <div>
-                  <span className="text-xs font-bold uppercase tracking-widest text-[#861F41]">
-                    {band.kind === "drum_corps"
-                      ? "Drum Corps"
-                      : band.kind === "marching_band"
-                        ? "Marching Band"
-                        : "Other Ensemble"}
+          {bands.map((band) => {
+            const validLogo =
+              typeof band.logo_path === "string" &&
+              new RegExp(
+                `^bands/${band.id}/[0-9a-f-]+\\.(png|jpg|webp)$`,
+                "i"
+              ).test(band.logo_path);
+
+            const logoUrl = validLogo
+              ? supabase.storage
+                  .from("band-logos")
+                  .getPublicUrl(band.logo_path!)
+                  .data.publicUrl
+              : null;
+
+            return (
+              <Link
+                key={band.id}
+                href={`/bands/${band.slug}`}
+                className="group flex flex-col justify-between rounded-2xl border border-slate-200 bg-white p-6 shadow-sm transition hover:border-[#861F41] hover:shadow-md"
+              >
+                <div className="flex items-start gap-4">
+                  <BandLogo
+                    name={band.name}
+                    logoUrl={logoUrl}
+                  />
+
+                  <div className="min-w-0 flex-1">
+                    <p className="text-xs font-bold uppercase tracking-widest text-[#861F41]">
+                      {band.kind === "drum_corps"
+                        ? "Drum Corps"
+                        : band.kind === "marching_band"
+                          ? "Marching Band"
+                          : "Other Ensemble"}
+                    </p>
+
+                    <h3 className="mt-2 text-xl font-bold text-[#002144] group-hover:text-[#861F41]">
+                      {band.name}
+                    </h3>
+
+                    <p className="mt-3 text-sm text-slate-500">
+                      {[
+                        band.city,
+                        band.state,
+                        band.country,
+                      ]
+                        .filter(Boolean)
+                        .join(", ") || "Location not recorded"}
+                    </p>
+                  </div>
+
+                  <span
+                    aria-hidden="true"
+                    className="shrink-0 text-lg text-[#861F41]"
+                  >
+                    &rarr;
                   </span>
-
-                  <h3 className="mt-2 text-xl font-bold text-[#002144] group-hover:text-[#861F41]">
-                    {band.name}
-                  </h3>
-
-                  <p className="mt-3 text-sm text-slate-500">
-                    {[
-                      band.city,
-                      band.state,
-                      band.country,
-                    ]
-                      .filter(Boolean)
-                      .join(", ")}
-                  </p>
                 </div>
 
-                <span
-                  aria-hidden="true"
-                  className="text-lg text-[#861F41]"
-                >
-                  →
-                </span>
-              </div>
-
-              <div className="mt-5">
-                <BandStatusBadge
-                  status={band.competitive_status}
-                />
-              </div>
-            </Link>
-          ))}
+                <div className="mt-5 border-t border-slate-100 pt-4">
+                  <BandStatusBadge
+                    status={band.competitive_status}
+                  />
+                </div>
+              </Link>
+            );
+          })}
         </div>
       ) : (
         <div className="rounded-2xl border border-slate-200 bg-white p-10 text-center">
@@ -233,9 +290,7 @@ export default function BandsPage(props: Props) {
           </div>
         }
       >
-        <BandDirectory
-          searchParams={props.searchParams}
-        />
+        <BandDirectory searchParams={props.searchParams} />
       </Suspense>
     </main>
   );

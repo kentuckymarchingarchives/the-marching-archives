@@ -9,32 +9,68 @@ import {
 import { createClient } from "@/lib/supabase/server";
 import { UUID_PATTERN } from "@/lib/band-validation";
 import { BAND_SLUG_PATTERN } from "@/lib/band-slugs";
+import BandStatusBadge from "@/components/BandStatusBadge";
 
 type Props = {
   params: Promise<{ id: string }>;
 };
+
+function ensembleType(kind: string): string {
+  if (kind === "drum_corps") {
+    return "Drum Corps";
+  }
+
+  if (kind === "marching_band") {
+    return "Marching Band";
+  }
+
+  return "Ensemble";
+}
+
+function yearRange(
+  start: number | null,
+  end: number | null
+): string {
+  if (start !== null && end !== null) {
+    return start === end
+      ? String(start)
+      : `${start}–${end}`;
+  }
+
+  if (start !== null) {
+    return `${start}–Present`;
+  }
+
+  if (end !== null) {
+    return `Through ${end}`;
+  }
+
+  return "Dates unknown";
+}
 
 async function BandProfileContent({ params }: Props) {
   const { id } = await params;
 
   const supabase = await createClient();
 
-  // Redirect older UUID profile links.
+  // Preserve older UUID links by redirecting
+  // them to the band's readable public URL.
   if (UUID_PATTERN.test(id)) {
-    const { data: oldBand, error } = await supabase
-      .from("bands")
-      .select("slug")
-      .eq("id", id)
-      .maybeSingle();
+    const { data: previousBand, error } =
+      await supabase
+        .from("bands")
+        .select("slug")
+        .eq("id", id)
+        .is("archived_at", null)
+        .maybeSingle();
 
-    if (error || !oldBand) {
+    if (error || !previousBand) {
       notFound();
     }
 
-    permanentRedirect(`/bands/${oldBand.slug}`);
+    permanentRedirect(`/bands/${previousBand.slug}`);
   }
 
-  // Validate readable profile URLs.
   if (
     id.length > 150 ||
     !BAND_SLUG_PATTERN.test(id)
@@ -45,9 +81,10 @@ async function BandProfileContent({ params }: Props) {
   const { data: band, error } = await supabase
     .from("bands")
     .select(
-      "id, slug, name, kind, city, state, country, notes"
+      "id, slug, name, kind, city, state, country, notes, competitive_status, logo_path"
     )
     .eq("slug", id)
+    .is("archived_at", null)
     .maybeSingle();
 
   if (error || !band) {
@@ -68,122 +105,234 @@ async function BandProfileContent({ params }: Props) {
 
   if (namesError) {
     throw new Error(
-      "Unable to load historical names."
+      "Unable to load historical band names."
     );
   }
 
+  const logoPathValid =
+    typeof band.logo_path === "string" &&
+    new RegExp(
+      `^bands/${band.id}/[0-9a-f-]+\\.(png|jpg|webp)$`,
+      "i"
+    ).test(band.logo_path);
+
+  const logoUrl = logoPathValid
+    ? supabase.storage
+        .from("band-logos")
+        .getPublicUrl(band.logo_path!)
+        .data.publicUrl
+    : null;
+
+  const location = [
+    band.city,
+    band.state,
+    band.country,
+  ]
+    .filter(Boolean)
+    .join(", ");
+
   return (
     <>
-      {/* Band profile heading */}
-      <section className="bg-[#002144] px-6 py-16 text-white">
+      {/* Profile heading */}
+      <section className="bg-[#002144] px-6 py-14 text-white md:py-20">
         <div className="mx-auto max-w-5xl">
           <Link
             href="/bands"
-            className="text-sm font-semibold text-[#E1BBC7]"
+            className="text-sm font-semibold text-[#E1BBC7] hover:text-white hover:underline"
           >
-            ← Band Directory
+            &larr; All Bands &amp; Drum Corps
           </Link>
 
-          <p className="mt-8 text-xs font-bold uppercase tracking-widest text-[#DAB1BF]">
-            {band.kind === "drum_corps"
-              ? "Drum Corps"
-              : band.kind === "marching_band"
-                ? "Marching Band"
-                : "Ensemble"}
-          </p>
+          <div className="mt-9 flex flex-wrap items-center gap-6 md:gap-8">
+            {/* Logo beside ensemble name */}
+            <div className="flex h-28 w-28 shrink-0 items-center justify-center overflow-hidden rounded-2xl border border-white/20 bg-white p-3 shadow-lg md:h-36 md:w-36">
+              {logoUrl ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={logoUrl}
+                  alt={`${band.name} logo`}
+                  className="h-full w-full object-contain"
+                />
+              ) : (
+                <svg
+                  viewBox="0 0 48 48"
+                  aria-hidden="true"
+                  className="h-14 w-14 text-slate-300"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                >
+                  <rect
+                    x="5"
+                    y="7"
+                    width="38"
+                    height="34"
+                    rx="5"
+                  />
+                  <circle cx="17" cy="18" r="4" />
+                  <path d="m9 35 11-11 7 7 5-5 7 9" />
+                </svg>
+              )}
+            </div>
 
-          <h1 className="mt-3 font-serif text-4xl font-bold md:text-5xl">
-            {band.name}
-          </h1>
+            <div className="min-w-0 flex-1">
+              <p className="text-xs font-bold uppercase tracking-[0.2em] text-[#E1BBC7]">
+                {ensembleType(band.kind)}
+              </p>
 
-          <p className="mt-4 text-slate-300">
-            {[band.city, band.state, band.country]
-              .filter(Boolean)
-              .join(", ")}
-          </p>
+              <h1 className="mt-3 font-serif text-4xl font-bold leading-tight md:text-5xl">
+                {band.name}
+              </h1>
+
+              <p className="mt-4 text-base text-slate-300">
+                {location || "Location not recorded"}
+              </p>
+            </div>
+          </div>
         </div>
       </section>
 
-      {/* Band profile information */}
-      <div className="mx-auto max-w-5xl space-y-6 px-6 py-10">
-        <section className="rounded-2xl border border-slate-200 bg-white p-7">
-          <h2 className="text-xl font-bold text-[#002144]">
-            About This Ensemble
-          </h2>
-
-          <p className="mt-4 whitespace-pre-wrap leading-7 text-slate-600">
-            {band.notes ||
-              "Additional historical information has not yet been recorded."}
-          </p>
-        </section>
-
-        <section className="rounded-2xl border border-slate-200 bg-white p-7">
-          <h2 className="text-xl font-bold text-[#002144]">
-            Historical Names
-          </h2>
-
-          {names?.length ? (
-            <div className="mt-5 space-y-4">
-              {names.map((name) => (
-                <div
-                  key={name.id}
-                  className="border-l-4 border-[#861F41] pl-4"
-                >
-                  <p className="font-semibold text-[#002144]">
-                    {name.historical_name}
-                  </p>
-
-                  <p className="mt-1 text-sm text-slate-500">
-                    {name.start_year ?? "Unknown"}
-                    {" – "}
-                    {name.end_year ?? "Present / Unknown"}
-                  </p>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <p className="mt-4 text-sm text-slate-600">
-              No historical names recorded.
+      {/* Basic profile information */}
+      <div className="bg-[#F4F6F9]">
+        <div className="mx-auto max-w-5xl space-y-8 px-6 py-12">
+          <section className="rounded-2xl border border-slate-200 bg-white p-7 shadow-sm">
+            <p className="text-xs font-bold uppercase tracking-widest text-[#861F41]">
+              Ensemble Information
             </p>
+
+            <h2 className="mt-3 font-serif text-2xl font-bold text-[#002144]">
+              About {band.name}
+            </h2>
+
+            <div className="mt-6 grid gap-6 sm:grid-cols-2">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">
+                  Ensemble Type
+                </p>
+
+                <p className="mt-2 font-bold text-[#002144]">
+                  {ensembleType(band.kind)}
+                </p>
+              </div>
+
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">
+                  Competitive Status
+                </p>
+
+                <div className="mt-2">
+                  <BandStatusBadge
+                    status={band.competitive_status}
+                  />
+                </div>
+              </div>
+
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">
+                  City
+                </p>
+
+                <p className="mt-2 font-bold text-[#002144]">
+                  {band.city || "Not recorded"}
+                </p>
+              </div>
+
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">
+                  State / Region
+                </p>
+
+                <p className="mt-2 font-bold text-[#002144]">
+                  {band.state || "Not recorded"}
+                </p>
+              </div>
+
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">
+                  Country
+                </p>
+
+                <p className="mt-2 font-bold text-[#002144]">
+                  {band.country || "Not recorded"}
+                </p>
+              </div>
+            </div>
+          </section>
+
+          {/* Historical names */}
+          <section className="rounded-2xl border border-slate-200 bg-white p-7 shadow-sm">
+            <p className="text-xs font-bold uppercase tracking-widest text-[#861F41]">
+              Ensemble History
+            </p>
+
+            <h2 className="mt-3 font-serif text-2xl font-bold text-[#002144]">
+              Historical Names
+            </h2>
+
+            {names?.length ? (
+              <div className="mt-6 divide-y divide-slate-100">
+                {names.map((name) => (
+                  <div
+                    key={name.id}
+                    className="flex flex-wrap items-start justify-between gap-3 py-4"
+                  >
+                    <p className="font-semibold text-[#002144]">
+                      {name.historical_name}
+                    </p>
+
+                    <span className="rounded-full bg-[#F4F6F9] px-3 py-1 text-xs font-semibold text-slate-600">
+                      {yearRange(
+                        name.start_year,
+                        name.end_year
+                      )}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="mt-4 text-sm leading-7 text-slate-600">
+                No historical name changes have been
+                documented for this ensemble.
+              </p>
+            )}
+          </section>
+
+          {/* Historical notes */}
+          {band.notes && (
+            <section className="rounded-2xl border border-slate-200 bg-white p-7 shadow-sm">
+              <p className="text-xs font-bold uppercase tracking-widest text-[#861F41]">
+                Historical Documentation
+              </p>
+
+              <h2 className="mt-3 font-serif text-2xl font-bold text-[#002144]">
+                Additional Information
+              </h2>
+
+              <p className="mt-5 whitespace-pre-wrap text-sm leading-8 text-slate-700">
+                {band.notes}
+              </p>
+            </section>
           )}
-        </section>
-
-        <section className="rounded-2xl border border-slate-200 bg-white p-7">
-          <h2 className="text-xl font-bold text-[#002144]">
-            Competition History
-          </h2>
-
-          <p className="mt-4 text-sm text-slate-600">
-            Historical competition appearances,
-            scores, and placements will be added
-            when we build the competition system.
-          </p>
-        </section>
+        </div>
       </div>
     </>
   );
 }
 
-export default function BandProfilePage({
-  params,
-}: Props) {
+export default function PublicBandPage(props: Props) {
   return (
     <main className="min-h-screen bg-[#F4F6F9]">
       <Suspense
         fallback={
           <div
             role="status"
-            className="mx-auto max-w-5xl px-6 py-16"
+            className="mx-auto max-w-5xl px-6 py-12 text-sm text-slate-600"
           >
-            <div className="rounded-2xl border border-slate-200 bg-white p-8">
-              <p className="text-sm text-slate-600">
-                Loading band profile...
-              </p>
-            </div>
+            Loading ensemble profile...
           </div>
         }
       >
-        <BandProfileContent params={params} />
+        <BandProfileContent params={props.params} />
       </Suspense>
     </main>
   );
