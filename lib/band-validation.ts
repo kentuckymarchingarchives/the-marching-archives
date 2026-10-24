@@ -35,7 +35,6 @@ export function validateBandFields(
 ) {
   const read = (key: string): string => {
     const value = formData.get(key);
-
     return typeof value === "string"
       ? value.trim()
       : "";
@@ -47,6 +46,7 @@ export function validateBandFields(
   const state = read("state");
   const country = read("country");
   const notes = read("notes");
+  const competitiveStatus = read("competitive_status");
 
   if (name.length < 2 || name.length > 200) {
     throw new Error(
@@ -55,9 +55,7 @@ export function validateBandFields(
   }
 
   if (!isBandKind(kind)) {
-    throw new Error(
-      "Choose a valid ensemble type."
-    );
+    throw new Error("Choose a valid ensemble type.");
   }
 
   if (
@@ -72,6 +70,17 @@ export function validateBandFields(
     );
   }
 
+  const allowedStatuses = [
+    "active_competing",
+    "active_noncompeting",
+    "inactive",
+    "unknown",
+  ];
+
+  if (!allowedStatuses.includes(competitiveStatus)) {
+    throw new Error("Choose a valid band status.");
+  }
+
   return {
     name,
     kind,
@@ -79,6 +88,7 @@ export function validateBandFields(
     state: state || null,
     country,
     notes: notes || null,
+    competitive_status: competitiveStatus,
   };
 }
 
@@ -87,7 +97,6 @@ export function validateHistoricalName(
 ) {
   const read = (key: string): string => {
     const value = formData.get(key);
-
     return typeof value === "string"
       ? value.trim()
       : "";

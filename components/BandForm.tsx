@@ -5,18 +5,23 @@ import {
 } from "@/lib/band-validation";
 
 import {
+  BAND_STATUSES,
+} from "@/components/BandStatusBadge";
+
+import {
   createBandSlug,
 } from "@/lib/band-slugs";
 
 export type BandFormValues = {
   id?: string;
+  slug?: string;
   name: string;
   kind: BandKind;
   city: string | null;
   state: string | null;
   country: string;
   notes: string | null;
-  slug?: string;
+  competitive_status?: string;
 };
 
 type Props = {
@@ -118,6 +123,33 @@ export default function BandForm({
         </label>
       </div>
 
+      <label className="block text-sm font-semibold text-[#002144]">
+        Competitive Status *
+
+        <select
+          name="competitive_status"
+          required
+          defaultValue={
+            band?.competitive_status ?? "unknown"
+          }
+          className={inputClass}
+        >
+          {BAND_STATUSES.map((status) => (
+            <option
+              key={status.value}
+              value={status.value}
+            >
+              {status.label}
+            </option>
+          ))}
+        </select>
+
+        <span className="mt-2 block text-xs font-normal text-slate-500">
+          Select the current operating and competitive
+          status of this ensemble.
+        </span>
+      </label>
+
       <div className="rounded-xl border border-slate-200 bg-[#F8FAFC] p-5">
         <h3 className="font-bold text-[#002144]">
           Public Profile URL
@@ -126,12 +158,12 @@ export default function BandForm({
         {band?.id ? (
           <>
             <p className="mt-3 break-all text-sm font-semibold text-[#861F41]">
-              marchingarchives.com/bands/{band.slug}
+              /bands/{band.slug}
             </p>
 
-            <p className="mt-2 text-xs leading-6 text-slate-600">
-              Your existing URL stays the same
-              when the band's name changes.
+            <p className="mt-2 text-xs text-slate-600">
+              Changing the band name will not
+              change its public URL.
             </p>
           </>
         ) : (
@@ -142,7 +174,7 @@ export default function BandForm({
             </p>
 
             <label className="mt-4 block text-sm font-semibold text-[#002144]">
-              Custom URL Slug (Optional)
+              Custom URL (Optional)
 
               <input
                 name="slug"
@@ -154,25 +186,22 @@ export default function BandForm({
             </label>
 
             <p className="mt-3 text-xs text-slate-500">
-              Example: Lafayette High School
-              becomes /bands/
-              {createBandSlug("Lafayette High School")}.
-              Only lowercase letters,
-              numbers, and hyphens are allowed.
+              Example: Lafayette High School becomes
+              /bands/{createBandSlug("Lafayette High School")}.
             </p>
           </>
         )}
       </div>
 
       <label className="block text-sm font-semibold text-[#002144]">
-        Research Notes
+        Historical Information / Notes
 
         <textarea
           name="notes"
           rows={5}
           maxLength={5000}
           defaultValue={band?.notes ?? ""}
-          placeholder="Optional historical information..."
+          placeholder="Optional public historical information..."
           className={inputClass}
         />
       </label>

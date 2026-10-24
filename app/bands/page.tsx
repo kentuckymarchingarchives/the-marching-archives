@@ -1,7 +1,9 @@
 
 import { Suspense } from "react";
 import Link from "next/link";
+
 import { createClient } from "@/lib/supabase/server";
+import BandStatusBadge from "@/components/BandStatusBadge";
 
 type Props = {
   searchParams: Promise<{
@@ -10,10 +12,14 @@ type Props = {
   }>;
 };
 
-async function BandDirectory({ searchParams }: Props) {
+async function BandDirectory({
+  searchParams,
+}: Props) {
   const params = await searchParams;
 
-  const search = (params.q ?? "").trim().slice(0, 100);
+  const search = (params.q ?? "")
+    .trim()
+    .slice(0, 100);
 
   const type =
     params.type === "marching_band" ||
@@ -26,7 +32,7 @@ async function BandDirectory({ searchParams }: Props) {
   let query = supabase
     .from("bands")
     .select(
-      "id, slug, name, kind, city, state, country"
+      "id, slug, name, kind, city, state, country, competitive_status"
     )
     .order("name", { ascending: true })
     .limit(100);
@@ -46,7 +52,6 @@ async function BandDirectory({ searchParams }: Props) {
 
   return (
     <div className="mx-auto max-w-7xl px-6 py-12">
-      {/* Search and filters */}
       <form
         method="get"
         className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm"
@@ -95,18 +100,18 @@ async function BandDirectory({ searchParams }: Props) {
         </div>
       </form>
 
-      {/* Results heading */}
-      <div className="mt-10 mb-5 flex flex-wrap items-center justify-between gap-3">
+      <div className="mb-5 mt-10 flex flex-wrap items-center justify-between gap-3">
         <h2 className="text-2xl font-bold text-[#002144]">
           {search ? "Search Results" : "Archive Directory"}
         </h2>
 
-        <span className="text-sm text-slate-500">
-          {bands?.length ?? 0} records displayed
-        </span>
+        {!error && (
+          <span className="text-sm text-slate-500">
+            {bands?.length ?? 0} records displayed
+          </span>
+        )}
       </div>
 
-      {/* Band results */}
       {error ? (
         <div
           role="alert"
@@ -148,14 +153,19 @@ async function BandDirectory({ searchParams }: Props) {
                   </p>
                 </div>
 
-                <span className="text-lg text-[#861F41]">
+                <span
+                  aria-hidden="true"
+                  className="text-lg text-[#861F41]"
+                >
                   →
                 </span>
               </div>
 
-              <p className="mt-5 text-xs font-medium text-slate-400">
-                /bands/{band.slug}
-              </p>
+              <div className="mt-5">
+                <BandStatusBadge
+                  status={band.competitive_status}
+                />
+              </div>
             </Link>
           ))}
         </div>
@@ -183,9 +193,7 @@ async function BandDirectory({ searchParams }: Props) {
       )}
 
       <p className="mt-6 text-xs text-slate-500">
-        The directory currently displays up to
-        100 matching records. Pagination will be
-        added as the archive grows.
+        Showing up to 100 matching records.
       </p>
     </div>
   );
@@ -194,7 +202,6 @@ async function BandDirectory({ searchParams }: Props) {
 export default function BandsPage(props: Props) {
   return (
     <main className="min-h-screen bg-[#F4F6F9]">
-      {/* Directory title banner */}
       <section className="bg-[#002144] px-6 py-16 text-white">
         <div className="mx-auto max-w-7xl">
           <p className="text-xs font-bold uppercase tracking-[0.25em] text-[#E0B4C2]">
@@ -214,7 +221,6 @@ export default function BandsPage(props: Props) {
         </div>
       </section>
 
-      {/* Supabase data loads inside Suspense */}
       <Suspense
         fallback={
           <div className="mx-auto max-w-7xl px-6 py-12">
@@ -227,7 +233,9 @@ export default function BandsPage(props: Props) {
           </div>
         }
       >
-        <BandDirectory searchParams={props.searchParams} />
+        <BandDirectory
+          searchParams={props.searchParams}
+        />
       </Suspense>
     </main>
   );
