@@ -2,19 +2,32 @@
 import { Suspense } from "react";
 import type { ReactNode } from "react";
 
+import PublicBandLogo from "@/components/PublicBandLogo";
 import BandCompetitionHistory from "@/components/BandCompetitionHistory";
 
-type BandLayoutProps = {
+type Props = {
   children: ReactNode;
   params: Promise<{
     id: string;
   }>;
 };
 
+async function BandLogoSection({
+  params,
+}: {
+  params: Props["params"];
+}) {
+  const { id } = await params;
+
+  return (
+    <PublicBandLogo bandIdentifier={id} />
+  );
+}
+
 async function CompetitionHistorySection({
   params,
 }: {
-  params: Promise<{ id: string }>;
+  params: Props["params"];
 }) {
   const { id } = await params;
 
@@ -25,12 +38,16 @@ async function CompetitionHistorySection({
   );
 }
 
-export default function BandLayout({
+export default function PublicBandLayout({
   children,
   params,
-}: BandLayoutProps) {
+}: Props) {
   return (
     <>
+      <Suspense fallback={null}>
+        <BandLogoSection params={params} />
+      </Suspense>
+
       {children}
 
       <Suspense
