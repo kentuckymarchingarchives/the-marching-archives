@@ -32,6 +32,11 @@ export default function BandProfileNavigation({
       section: "championships",
     },
     {
+      label: "Timeline",
+      href: `${base}/timeline`,
+      section: "timeline",
+    },
+    {
       label: "Achievements",
       href: `${base}/achievements`,
       section: "achievements",
