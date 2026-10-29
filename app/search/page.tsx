@@ -245,168 +245,84 @@ const inputClass =
   "mt-2 w-full rounded-lg border border-slate-300 bg-white px-4 py-3 text-sm text-[#002144] focus:border-[#861F41] focus:outline-none focus:ring-2 focus:ring-[#861F41]/20";
 
 function SearchForm({ filters }: { filters: Filters }) {
+  const activeFilters = [
+    filters.q, filters.kind, filters.city, filters.state,
+    filters.organization, filters.type, filters.from, filters.to,
+  ].filter(Boolean).length;
+
   return (
-    <form
-      method="get"
-      action="/search"
-      role="search"
-      className="space-y-6 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm md:p-8"
-    >
-      <div>
-        <label
-          htmlFor="archive-q"
-          className="text-sm font-bold text-[#002144]"
-        >
-          Search Ensemble or Competition Names
-        </label>
-
-        <div className="relative mt-2">
-          <svg
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-            aria-hidden="true"
-            className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-400"
-          >
-            <circle cx="11" cy="11" r="7" />
-            <path d="m16 16 5 5" />
-          </svg>
-
-          <input
-            id="archive-q"
-            type="search"
-            name="q"
-            maxLength={100}
-            defaultValue={filters.q}
-            placeholder="Current band name, former band name, or event..."
-            className={`${inputClass} mt-0 py-4 pl-12`}
-          />
+    <section aria-labelledby="search-filters-heading" className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 px-6 py-5 md:px-8">
+        <div>
+          <p className="text-xs font-extrabold uppercase tracking-[0.18em] text-[#861F41]">Find a record</p>
+          <h2 id="search-filters-heading" className="mt-1 text-xl font-extrabold tracking-tight text-[#002144]">Search &amp; refine</h2>
         </div>
+        <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-bold text-slate-600">
+          {activeFilters} active {activeFilters === 1 ? "filter" : "filters"}
+        </span>
       </div>
+      <form method="get" action="/search" role="search" className="space-y-6 p-6 md:p-8">
+        <div>
+          <label htmlFor="archive-q" className="block text-sm font-bold text-[#002144]">Band, corps, or competition name</label>
+          <div className="relative mt-2">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true" className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-400">
+              <circle cx="11" cy="11" r="7" /><path d="m16 16 5 5" />
+            </svg>
+            <input id="archive-q" type="search" name="q" maxLength={100} defaultValue={filters.q}
+              placeholder="Search by a current or historical name…"
+              className="w-full rounded-xl border border-slate-300 bg-white py-4 pl-12 pr-4 text-base text-[#002144] placeholder:text-slate-400 focus:border-[#861F41] focus:outline-none focus:ring-2 focus:ring-[#861F41]/20" />
+          </div>
+        </div>
 
-      <div className="grid gap-5 md:grid-cols-2 lg:grid-cols-4">
-        <label className="text-sm font-semibold text-[#002144]">
-          Ensemble Type
-          <select
-            name="kind"
-            defaultValue={filters.kind}
-            className={inputClass}
-          >
-            <option value="">All Ensemble Types</option>
-            {BAND_KINDS.map((kind) => (
-              <option key={kind.value} value={kind.value}>
-                {kind.label}
-              </option>
-            ))}
-          </select>
-        </label>
-
-        <label className="text-sm font-semibold text-[#002144]">
-          City
-          <input
-            name="city"
-            maxLength={100}
-            defaultValue={filters.city}
-            placeholder="Example: Richmond"
-            className={inputClass}
-          />
-        </label>
-
-        <label className="text-sm font-semibold text-[#002144]">
-          State / Province
-          <input
-            name="state"
-            maxLength={100}
-            defaultValue={filters.state}
-            placeholder="Example: Kentucky"
-            className={inputClass}
-          />
-        </label>
-
-        <label className="text-sm font-semibold text-[#002144]">
-          Organization
-          <select
-            name="organization"
-            defaultValue={filters.organization}
-            className={inputClass}
-          >
-            <option value="">All Organizations</option>
-            {ORGANIZATIONS.map((organization) => (
-              <option key={organization} value={organization}>
-                {organization}
-              </option>
-            ))}
-          </select>
-        </label>
-
-        <label className="text-sm font-semibold text-[#002144]">
-          Competition Type
-          <select
-            name="type"
-            defaultValue={filters.type}
-            className={inputClass}
-          >
-            <option value="">All Competition Types</option>
-            {COMPETITION_TYPES.map(([value, label]) => (
-              <option key={value} value={value}>
-                {label}
-              </option>
-            ))}
-          </select>
-        </label>
-
-        <label className="text-sm font-semibold text-[#002144]">
-          Season From
-          <input
-            type="number"
-            name="from"
-            min={1800}
-            max={2200}
-            placeholder="Earliest year"
-            defaultValue={filters.from}
-            className={inputClass}
-          />
-        </label>
-
-        <label className="text-sm font-semibold text-[#002144]">
-          Season Through
-          <input
-            type="number"
-            name="to"
-            min={1800}
-            max={2200}
-            placeholder="Latest year"
-            defaultValue={filters.to}
-            className={inputClass}
-          />
-        </label>
-      </div>
-
-      <div className="flex flex-wrap gap-3">
-        <button
-          type="submit"
-          className="cursor-pointer rounded-lg bg-[#861F41] px-7 py-3 text-sm font-bold text-white hover:bg-[#701832]"
-        >
-          Search Archive &rarr;
-        </button>
-
-        <Link
-          href="/search"
-          className="rounded-lg border border-slate-300 px-6 py-3 text-sm font-bold text-[#002144] hover:bg-slate-50"
-        >
-          Clear All Filters
-        </Link>
-      </div>
-
-      <p className="text-xs leading-6 text-slate-500">
-        Ensemble Type applies to bands and drum corps.
-        Organization, Competition Type, and Season Range
-        apply to competitions. City and State apply to both.
-        Name search includes historical ensemble names
-        where they are recorded.
-      </p>
-    </form>
+        <details className="group rounded-xl border border-slate-200 bg-slate-50/70 p-5" open={activeFilters > 1}>
+          <summary className="flex cursor-pointer list-none items-center justify-between gap-2 text-sm font-extrabold text-[#002144] [&::-webkit-details-marker]:hidden">
+            Advanced filters
+            <span className="text-xs font-semibold text-[#861F41] group-open:hidden">Show filters +</span>
+            <span className="hidden text-xs font-semibold text-[#861F41] group-open:inline">Hide filters −</span>
+          </summary>
+          <div className="mt-5 grid gap-4 border-t border-slate-200 pt-5 sm:grid-cols-2 lg:grid-cols-4">
+            <label className="text-sm font-semibold text-[#002144]">Ensemble type
+              <select name="kind" defaultValue={filters.kind} className={inputClass}>
+                <option value="">All ensemble types</option>
+                {BAND_KINDS.map((kind) => <option key={kind.value} value={kind.value}>{kind.label}</option>)}
+              </select>
+            </label>
+            <label className="text-sm font-semibold text-[#002144]">City
+              <input name="city" maxLength={100} defaultValue={filters.city} placeholder="e.g. Richmond" className={inputClass} />
+            </label>
+            <label className="text-sm font-semibold text-[#002144]">State / province
+              <input name="state" maxLength={100} defaultValue={filters.state} placeholder="e.g. Kentucky" className={inputClass} />
+            </label>
+            <label className="text-sm font-semibold text-[#002144]">Organization
+              <select name="organization" defaultValue={filters.organization} className={inputClass}>
+                <option value="">All organizations</option>
+                {ORGANIZATIONS.map((organization) => <option key={organization} value={organization}>{organization}</option>)}
+              </select>
+            </label>
+            <label className="text-sm font-semibold text-[#002144]">Competition type
+              <select name="type" defaultValue={filters.type} className={inputClass}>
+                <option value="">All competition types</option>
+                {COMPETITION_TYPES.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+              </select>
+            </label>
+            <label className="text-sm font-semibold text-[#002144]">Season from
+              <input type="number" name="from" min={1800} max={2200} placeholder="Earliest year" defaultValue={filters.from} className={inputClass} />
+            </label>
+            <label className="text-sm font-semibold text-[#002144]">Season through
+              <input type="number" name="to" min={1800} max={2200} placeholder="Latest year" defaultValue={filters.to} className={inputClass} />
+            </label>
+          </div>
+          <p className="mt-4 text-xs leading-6 text-slate-500">
+            Ensemble type filters bands and corps. Organization, competition type, and seasons filter events.
+            Location filters both. Former ensemble names are included when recorded.
+          </p>
+        </details>
+        <div className="flex flex-wrap items-center gap-3">
+          <button type="submit" className="rounded-xl bg-[#861F41] px-7 py-3.5 text-sm font-extrabold text-white transition hover:bg-[#6d1733]">Search archive →</button>
+          <Link href="/search" className="rounded-xl border border-slate-300 bg-white px-6 py-3.5 text-sm font-bold text-[#002144] hover:bg-slate-50">Reset filters</Link>
+        </div>
+      </form>
+    </section>
   );
 }
 
@@ -584,7 +500,7 @@ async function SearchContent({
     process.env.NEXT_PUBLIC_SUPABASE_URL ?? "";
 
   return (
-    <div className="mx-auto max-w-7xl space-y-10 px-6 py-10">
+    <div className="mx-auto max-w-7xl space-y-10 px-6 py-10 md:px-8 md:py-14">
       <SearchForm filters={filters} />
 
       {invalidRange && (
@@ -625,7 +541,7 @@ async function SearchContent({
           <div className="grid gap-4 sm:grid-cols-2">
             <a
               href="#ensembles"
-              className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm hover:border-[#861F41]"
+              className="group rounded-2xl border border-slate-200 bg-white p-6 shadow-sm transition hover:-translate-y-0.5 hover:border-[#861F41]/50 hover:shadow-md"
             >
               <p className="text-xs font-bold uppercase tracking-widest text-[#861F41]">
                 Matching Ensembles
@@ -644,7 +560,7 @@ async function SearchContent({
 
             <a
               href="#competitions"
-              className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm hover:border-[#861F41]"
+              className="group rounded-2xl border border-slate-200 bg-white p-6 shadow-sm transition hover:-translate-y-0.5 hover:border-[#861F41]/50 hover:shadow-md"
             >
               <p className="text-xs font-bold uppercase tracking-widest text-[#861F41]">
                 Matching Competitions
@@ -672,7 +588,7 @@ async function SearchContent({
                   Ensemble Records
                 </p>
 
-                <h2 className="mt-2 font-serif text-3xl font-bold text-[#002144]">
+                <h2 className="mt-2 text-3xl font-extrabold tracking-tight text-[#002144]">
                   Bands &amp; Drum Corps
                 </h2>
               </div>
@@ -707,7 +623,7 @@ async function SearchContent({
                   {bands.map((band) => (
                     <article
                       key={band.id}
-                      className="flex items-start gap-4 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm hover:border-[#861F41]"
+                      className="flex items-start gap-4 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm transition hover:border-[#861F41]/40 hover:shadow-md"
                     >
                       <BandLogo
                         name={band.name}
@@ -773,7 +689,7 @@ async function SearchContent({
                   Competition Records
                 </p>
 
-                <h2 className="mt-2 font-serif text-3xl font-bold text-[#002144]">
+                <h2 className="mt-2 text-3xl font-extrabold tracking-tight text-[#002144]">
                   Historical Competitions
                 </h2>
               </div>
@@ -809,7 +725,7 @@ async function SearchContent({
                   {competitions.map((competition) => (
                     <article
                       key={competition.id}
-                      className="flex items-start gap-4 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm hover:border-[#861F41]"
+                      className="flex items-start gap-4 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm transition hover:border-[#861F41]/40 hover:shadow-md"
                     >
                       <OrganizationMark
                         code={competition.organization_code}
@@ -882,7 +798,7 @@ async function SearchContent({
         </>
       )}
 
-      <section className="rounded-2xl border border-slate-200 bg-white p-6">
+      <section className="rounded-2xl border border-slate-200 bg-white p-7">
         <h2 className="font-bold text-[#002144]">
           About Historical Search
         </h2>
@@ -902,37 +818,29 @@ async function SearchContent({
 
 export default function SearchPage(props: Props) {
   return (
-    <main className="min-h-screen bg-[#F4F6F9]">
-      <section className="bg-[#002144] px-6 py-16 text-white">
-        <div className="mx-auto max-w-7xl">
-          <p className="text-xs font-bold uppercase tracking-[0.2em] text-[#E0B4C2]">
-            The Marching Archives
+    <main className="min-h-screen bg-[#f6f7f9]">
+      <section className="relative overflow-hidden bg-[#002144] px-6 py-14 text-white md:py-20">
+        <div className="pointer-events-none absolute right-48 top-48 h-128 w-lg rounded-full bg-[#861F41]/25 blur-3xl" />
+        <div className="relative mx-auto max-w-7xl md:px-2">
+          <nav aria-label="Breadcrumb" className="mb-7 text-sm text-slate-300">
+            <Link href="/" className="hover:text-white">Home</Link> <span className="mx-2 text-slate-500">/</span> <span aria-current="page" className="font-semibold text-white">Search</span>
+          </nav>
+          <p className="text-xs font-extrabold uppercase tracking-[0.2em] text-[#e6a9bc]">Research the archive</p>
+          <h1 className="mt-4 max-w-3xl text-4xl font-extrabold tracking-tight md:text-6xl">Find the history behind every result.</h1>
+          <p className="mt-5 max-w-2xl text-base leading-8 text-slate-200 md:text-lg">
+            Search bands, drum corps, and published competitions in one place. Narrow your results by location, organization, season, and event type.
           </p>
-
-          <h1 className="mt-4 font-serif text-4xl font-bold md:text-5xl">
-            Advanced Archive Search
-          </h1>
-
-          <p className="mt-5 max-w-2xl text-lg leading-8 text-slate-300">
-            Search ensembles by current or former names,
-            explore published competitions, and narrow
-            your research by place, organization, or era.
-          </p>
+          <div className="mt-7 flex flex-wrap gap-3 text-sm font-semibold">
+            <a href="#ensembles" className="rounded-full border border-white/25 bg-white/10 px-4 py-2 text-white hover:bg-white/20">Ensembles ↓</a>
+            <a href="#competitions" className="rounded-full border border-white/25 bg-white/10 px-4 py-2 text-white hover:bg-white/20">Competitions ↓</a>
+          </div>
         </div>
       </section>
-
-      <Suspense
-        fallback={
-          <div className="mx-auto max-w-7xl px-6 py-12">
-            <div
-              role="status"
-              className="rounded-2xl border border-slate-200 bg-white p-8 text-sm text-slate-600"
-            >
-              Searching historical records...
-            </div>
-          </div>
-        }
-      >
+      <Suspense fallback={
+        <div className="mx-auto max-w-7xl px-6 py-12 md:px-8">
+          <div role="status" className="rounded-2xl border border-slate-200 bg-white p-8 text-sm text-slate-600">Searching historical records...</div>
+        </div>
+      }>
         <SearchContent searchParams={props.searchParams} />
       </Suspense>
     </main>
