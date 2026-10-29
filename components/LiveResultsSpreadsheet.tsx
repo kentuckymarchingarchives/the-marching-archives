@@ -484,6 +484,13 @@ export default function LiveResultsSpreadsheet({
           >
             Configure Scoring Formula
           </Link>
+          
+          <Link
+            href={`${base}/penalties`}
+            className="rounded-lg border border-slate-300 bg-white px-5 py-3 text-sm font-bold text-[#002144] hover:bg-slate-50"
+          >
+            Individual Penalties
+          </Link>
 
           <Link
             href={`${base}#captions`}
