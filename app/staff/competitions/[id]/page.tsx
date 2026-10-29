@@ -1,4 +1,3 @@
-
 import { Suspense } from "react";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
@@ -256,6 +255,33 @@ async function CompetitionManagement({
           </div>
         )}
 
+        {/* Accessible workflow shortcuts; authorization is enforced by each route. */}
+        <nav aria-label="Competition management workflow" className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          <a href="#competition-rounds" className="group rounded-2xl border border-slate-200 bg-white p-5 shadow-sm transition hover:border-[#861F41]/40 hover:shadow-md">
+            <span className="text-xs font-extrabold uppercase tracking-widest text-[#861F41]">01 · Enter results</span>
+            <span className="mt-2 block text-lg font-bold text-[#002144]">Rounds &amp; spreadsheets →</span>
+            <span className="mt-2 block text-sm text-slate-600">Open a round to manage scores, captions and placements.</span>
+          </a>
+          <Link href={`/staff/competitions/${id}/review`} className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm transition hover:border-[#861F41]/40 hover:shadow-md">
+            <span className="text-xs font-extrabold uppercase tracking-widest text-[#861F41]">02 · Verify</span>
+            <span className="mt-2 block text-lg font-bold text-[#002144]">Review results →</span>
+            <span className="mt-2 block text-sm text-slate-600">Inspect results and outstanding validation issues.</span>
+          </Link>
+          {canPublish ? (
+            <Link href={`/staff/competitions/${id}/publish`} className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm transition hover:border-[#861F41]/40 hover:shadow-md">
+              <span className="text-xs font-extrabold uppercase tracking-widest text-[#861F41]">03 · Owner / Admin</span>
+              <span className="mt-2 block text-lg font-bold text-[#002144]">Publish competition →</span>
+              <span className="mt-2 block text-sm text-slate-600">Review publication status and publishing controls.</span>
+            </Link>
+          ) : (
+            <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-5">
+              <span className="text-xs font-extrabold uppercase tracking-widest text-slate-500">03 · Owner / Admin</span>
+              <span className="mt-2 block text-lg font-bold text-[#002144]">Publish competition</span>
+              <span className="mt-2 block text-sm text-slate-600">Only Owners and Administrators may publish.</span>
+            </div>
+          )}
+        </nav>
+
         <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           <InfoCard
             label="Organization"
@@ -406,6 +432,15 @@ async function CompetitionManagement({
 
                       {!archived && (
                         <Link
+                          href={`/staff/competitions/${id}/rounds/${round.id}/spreadsheet`}
+                          className="inline-flex items-center justify-center rounded-lg border border-[#861F41]/30 bg-[#861F41]/5 px-5 py-3 text-sm font-bold text-[#861F41] transition hover:bg-[#861F41]/10"
+                        >
+                          Open Spreadsheet
+                        </Link>
+                      )}
+
+                      {!archived && (
+                        <Link
                           href={`/staff/competitions/${id}/rounds/${round.id}/tools`}
                           className="inline-flex items-center justify-center rounded-lg border border-slate-300 bg-white px-5 py-3 text-sm font-bold text-[#002144] transition hover:bg-slate-50"
                         >
@@ -456,12 +491,14 @@ async function CompetitionManagement({
               Full Review Report
             </Link>
 
-            <Link
-              href={`/staff/competitions/${id}/publish`}
-              className="rounded-lg bg-[#002144] px-5 py-3 text-sm font-bold text-white hover:bg-[#123B63]"
-            >
-              Review &amp; Publish &rarr;
-            </Link>
+            {canPublish && (
+              <Link
+                href={`/staff/competitions/${id}/publish`}
+                className="rounded-lg bg-[#002144] px-5 py-3 text-sm font-bold text-white hover:bg-[#123B63]"
+              >
+                Review &amp; Publish &rarr;
+              </Link>
+            )}
 
             {published && competition.slug && (
               <Link
