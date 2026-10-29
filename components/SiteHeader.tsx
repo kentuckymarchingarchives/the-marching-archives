@@ -1,104 +1,164 @@
 
+"use client";
+
 import Image from "next/image";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
+import { useState } from "react";
 
-const navigation = [
-  {
-    label: "Home",
-    href: "/",
-  },
-  {
-    label: "Bands & Corps",
-    href: "/bands",
-  },
-  {
-    label: "Competitions",
-    href: "/competitions",
-  },
-  {
-    label: "Organizations",
-    href: "/organizations",
-  },
+const links = [
+  { href: "/bands", label: "Bands & Corps" },
+  { href: "/competitions", label: "Competitions" },
+  { href: "/organizations", label: "Organizations" },
 ];
 
 export default function SiteHeader() {
+  const pathname = usePathname();
+  const [open, setOpen] = useState(false);
+
   return (
-    <header className="relative z-20 border-b border-white/10 bg-[#002144] text-white">
-      <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-5 px-5 py-4 md:px-8">
-        {/* Website logo and identity */}
+    <header className="site-header sticky top-0 z-50 border-b border-slate-200/80 bg-white/95 shadow-sm backdrop-blur-xl">
+      <div className="mx-auto flex h-24 max-w-7xl items-center justify-between gap-5 px-5 md:px-8">
+
+        {/* Logo and Website Name */}
         <Link
           href="/"
-          aria-label="The Marching Archives homepage"
-          className="flex min-w-0 items-center gap-4"
+          className="flex min-w-0 items-center gap-3"
+          onClick={() => setOpen(false)}
         >
-          <div className="flex h-20 w-20 shrink-0 items-center justify-center rounded-xl bg-white p-2 shadow-sm md:h-24 md:w-24">
+          <span className="flex h-72px w-72px shrink-0 items-center justify-center">
             <Image
               src="/tma-logo.png"
               alt="The Marching Archives logo"
-              width={96}
-              height={96}
-              priority
+              width={72}
+              height={72}
               className="h-full w-full object-contain"
+              priority
             />
-          </div>
+          </span>
 
-          <div className="min-w-0">
-            <span className="block font-serif text-lg font-bold tracking-wide md:text-2xl">
+          <span className="min-w-0">
+            <strong className="block truncate text-[15px] font-extrabold tracking-tight text-[#002144] sm:text-xl">
               The Marching Archives
+            </strong>
+            <span className="block text-[10px] font-semibold uppercase tracking-[.15em] text-slate-500 sm:text-xs">
+              Competitive History, Preserved
             </span>
-
-            <span className="block text-[10px] font-semibold uppercase tracking-[0.16em] text-[#E0B4C2] md:text-xs">
-              Preserving Marching History
-            </span>
-          </div>
+          </span>
         </Link>
 
-        {/* Main navigation */}
+        {/* Desktop Navigation */}
         <nav
-          aria-label="Main navigation"
-          className="flex w-full flex-wrap items-center gap-2 sm:w-auto"
+          aria-label="Primary navigation"
+          className="hidden items-center gap-1 lg:flex"
         >
-          {navigation.map((item) => (
-            <Link
-              key={item.href}
-              href={item.href}
-              className="rounded-lg px-3 py-2 text-sm font-semibold text-slate-200 transition-colors hover:bg-white/10 hover:text-white"
-            >
-              {item.label}
-            </Link>
-          ))}
+          {links.map((link) => {
+            const isActive =
+              pathname === link.href ||
+              pathname.startsWith(`${link.href}/`);
 
-          {/* Unified archive search */}
+            return (
+              <Link
+                key={link.href}
+                href={link.href}
+                aria-current={isActive ? "page" : undefined}
+                className={`rounded-lg px-4 py-2.5 text-sm font-semibold transition ${
+                  isActive
+                    ? "bg-[#002144]/[.07] text-[#002144]"
+                    : "text-slate-600 hover:bg-slate-100 hover:text-[#002144]"
+                }`}
+              >
+                {link.label}
+              </Link>
+            );
+          })}
+
           <Link
             href="/search"
-            aria-label="Search The Marching Archives"
-            className="inline-flex items-center gap-2 rounded-lg border border-white/25 px-4 py-2.5 text-sm font-bold text-white transition-colors hover:border-white/50 hover:bg-white/10"
+            aria-current={
+              pathname.startsWith("/search") ? "page" : undefined
+            }
+            className="ml-2 rounded-lg bg-[#861F41] px-5 py-2.5 text-sm font-bold text-white transition hover:bg-[#6d1733]"
           >
-            <svg
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              className="h-4 w-4"
-              aria-hidden="true"
-            >
-              <circle cx="11" cy="11" r="7" />
-              <path d="m16 16 5 5" />
-            </svg>
-            Search
-          </Link>
-
-          {/* Staff login */}
-          <Link
-            href="/staff/login"
-            className="ml-1 rounded-lg bg-[#861F41] px-4 py-2.5 text-sm font-bold text-white transition-colors hover:bg-[#A02B52]"
-          >
-            Staff Login
+            Search Archive ↗
           </Link>
         </nav>
+
+        {/* Mobile Menu Button */}
+        <button
+          type="button"
+          className="rounded-lg border border-slate-200 p-2.5 text-[#002144] transition hover:bg-slate-100 lg:hidden"
+          onClick={() => setOpen(!open)}
+          aria-expanded={open}
+          aria-controls="mobile-menu"
+          aria-label={open ? "Close menu" : "Open menu"}
+        >
+          <svg
+            width="22"
+            height="22"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            aria-hidden="true"
+          >
+            {open ? (
+              <path d="M5 5l14 14M19 5L5 19" />
+            ) : (
+              <path d="M4 7h16M4 12h16M4 17h16" />
+            )}
+          </svg>
+        </button>
       </div>
+
+      {/* Mobile Navigation */}
+      {open && (
+        <nav
+          id="mobile-menu"
+          aria-label="Mobile navigation"
+          className="border-t border-slate-200 bg-white px-5 py-4 shadow-lg lg:hidden"
+        >
+          <div className="mx-auto flex max-w-7xl flex-col gap-1">
+            {[
+              { href: "/", label: "Home" },
+              ...links,
+              { href: "/search", label: "Search Archive" },
+            ].map((link) => {
+              const isActive =
+                pathname === link.href ||
+                (link.href !== "/" &&
+                  pathname.startsWith(`${link.href}/`));
+
+              return (
+                <Link
+                  key={link.href}
+                  href={link.href}
+                  onClick={() => setOpen(false)}
+                  aria-current={isActive ? "page" : undefined}
+                  className={`rounded-lg px-4 py-3 font-semibold transition ${
+                    isActive
+                      ? "bg-[#002144]/[.07] text-[#002144]"
+                      : "text-slate-700 hover:bg-slate-100"
+                  }`}
+                >
+                  {link.label}
+                </Link>
+              );
+            })}
+
+            <div className="my-2 border-t border-slate-200" />
+
+            <Link
+              href="/staff/login"
+              onClick={() => setOpen(false)}
+              className="rounded-lg px-4 py-3 text-sm font-medium text-slate-500 hover:bg-slate-100"
+            >
+              Staff Access
+            </Link>
+          </div>
+        </nav>
+      )}
     </header>
   );
 }

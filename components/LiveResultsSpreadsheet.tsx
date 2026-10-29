@@ -795,7 +795,7 @@ export default function LiveResultsSpreadsheet({
                   >
                     <th
                       scope="row"
-                      className={`sticky left-0 z-[1] max-w-60 border-r border-slate-200 px-4 py-3 font-bold text-[#002144] ${
+                      className={`sticky left-0 z-1 max-w-60 border-r border-slate-200 px-4 py-3 font-bold text-[#002144] ${
                         modified
                           ? "bg-amber-50"
                           : "bg-white"
