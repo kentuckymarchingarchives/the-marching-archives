@@ -1,7 +1,5 @@
 "use client";
 
-import { formatTotalScore, formatCaptionScore } from "@/lib/score-format";
-
 import {
   useActionState,
   useEffect,
@@ -95,6 +93,19 @@ function officialTotal(
   return row.totalMode === "manual"
     ? parseScore(row.manualTotal)
     : calculatedTotal(row, captions, formula, penaltyTotals);
+}
+
+// Totals are presented to three places; calculations retain full precision.
+function scoreText(value: number | null): string {
+  return value === null ? "—" : value.toFixed(3);
+}
+
+// Caption values may have a significant third or fourth decimal place.
+function captionText(value: number): string {
+  return value.toFixed(4).replace(/0+$/, "").replace(/\.$/, "").replace(
+    /^(\d+)(?:\.(\d))?$/,
+    (_match, whole: string, digit?: string) => `${whole}.${digit ?? "0"}0`
+  );
 }
 
 type RankedRecord = {
@@ -238,6 +249,8 @@ export default function LiveResultsSpreadsheet({
   );
 
   const [notice, setNotice] = useState("");
+  const [search, setSearch] = useState("");
+  const [showOnlyModified, setShowOnlyModified] = useState(false);
   const [pasteError, setPasteError] = useState("");
   const [confirmRankFill, setConfirmRankFill] =
     useState(false);
@@ -266,6 +279,14 @@ export default function LiveResultsSpreadsheet({
     () => computeRankings(rows, captions, formula, penaltyTotals),
     [rows, captions, formula, penaltyTotals]
   );
+
+  const displayedRows = rows
+    .map((row, index) => ({ row, originalIndex: index }))
+    .filter(({ row, originalIndex }) => {
+      const matchesSearch = row.bandName.toLowerCase().includes(search.trim().toLowerCase());
+      const modified = JSON.stringify(row) !== JSON.stringify(initialRows[originalIndex]);
+      return matchesSearch && (!showOnlyModified || modified);
+    });
 
   const scoredCount = rows.filter(
     (row) => officialTotal(row, captions, formula, penaltyTotals) !== null
@@ -581,10 +602,9 @@ export default function LiveResultsSpreadsheet({
         </div>
       )}
 
-      <section className="rounded-2xl border border-slate-200 bg-white p-6">
-        <h2 className="text-lg font-bold text-[#002144]">
-          Bulk Paste from a Spreadsheet
-        </h2>
+      <details className="rounded-xl border border-slate-200 bg-white p-5">
+        <summary className="font-bold text-[#002144]">Bulk paste instructions</summary>
+        <h2 className="sr-only">Bulk Paste from a Spreadsheet</h2>
 
         <p className="mt-3 text-sm leading-7 text-slate-600">
           In Excel or Google Sheets, copy a rectangle
@@ -601,12 +621,11 @@ export default function LiveResultsSpreadsheet({
           name. Blank cells clear caption scores.
           Invalid values or ranges are rejected entirely.
         </p>
-      </section>
+      </details>
 
-      <section className="rounded-2xl border border-slate-200 bg-white p-6">
-        <h2 className="text-lg font-bold text-[#002144]">
-          Score-Based Placement Tools
-        </h2>
+      <details className="rounded-xl border border-slate-200 bg-white p-5">
+        <summary className="font-bold text-[#002144]">Placement tools (optional)</summary>
+        <h2 className="sr-only">Score-Based Placement Tools</h2>
 
         <p className="mt-3 text-sm leading-7 text-slate-600">
           Calculate placements using the current
@@ -652,7 +671,7 @@ export default function LiveResultsSpreadsheet({
         >
           Fill Placements from Scores
         </button>
-      </section>
+      </details>
 
       {pasteError && (
         <div
@@ -702,6 +721,18 @@ export default function LiveResultsSpreadsheet({
           value={JSON.stringify(dirty)}
         />
 
+        <div className="flex flex-wrap items-center gap-3 rounded-xl border border-slate-200 bg-white p-4">
+          <label htmlFor="spreadsheet-search" className="text-sm font-bold text-[#002144]">Find ensemble</label>
+          <input id="spreadsheet-search" type="search" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search by name…" className="min-w-0 flex-1 rounded-lg border border-slate-300 px-3 py-2 text-sm text-[#002144] sm:max-w-xs" />
+          <label className="flex items-center gap-2 text-sm text-slate-700">
+            <input type="checkbox" checked={showOnlyModified} onChange={(event) => setShowOnlyModified(event.target.checked)} />
+            Unsaved only
+          </label>
+          <span className="text-xs text-slate-500">Showing {displayedRows.length} of {rows.length} ensembles</span>
+          {(search || showOnlyModified) && <button type="button" onClick={() => { setSearch(""); setShowOnlyModified(false); }} className="text-sm font-semibold text-[#861F41]">Clear filters</button>}
+          <p className="w-full text-xs text-slate-500">Bulk paste follows the full original ensemble order, including rows hidden by filters. Clear filters before pasting ranges.</p>
+        </div>
+
         <div className="overflow-x-auto rounded-2xl border border-slate-200 bg-white shadow-sm">
           <table className="w-full min-w-max border-collapse text-left text-sm">
             <thead className="bg-[#002144] text-white">
@@ -728,7 +759,7 @@ export default function LiveResultsSpreadsheet({
                     </span>
 
                     <span className="mt-1 block text-xs font-normal text-slate-300">
-                      Max {formatCaptionScore(caption.max_score)}
+                      Max {caption.max_score}
                       {" · "}×{caption.multiplier}
                     </span>
                   </th>
@@ -764,7 +795,7 @@ export default function LiveResultsSpreadsheet({
             </thead>
 
             <tbody className="divide-y divide-slate-200">
-              {rows.map((row, rowIndex) => {
+              {displayedRows.map(({ row, originalIndex: rowIndex }) => {
                 const calculated = calculatedTotal(
                   row, captions, formula, penaltyTotals
                 );
@@ -851,24 +882,28 @@ export default function LiveResultsSpreadsheet({
                               event.target.value
                             )
                           }
-                          onPaste={(event) =>
-                            pasteCaptions(
-                              event,
-                              rowIndex,
-                              columnIndex
-                            )
-                          }
+                          onPaste={(event) => {
+                            if (search || showOnlyModified) {
+                              const raw = event.clipboardData.getData("text");
+                              if (raw.includes("\t") || raw.includes("\n")) {
+                                event.preventDefault();
+                                setPasteError("Clear ensemble filters before pasting multiple cells. No changes were made.");
+                                return;
+                              }
+                            }
+                            pasteCaptions(event, rowIndex, columnIndex);
+                          }}
                           className={inputClass}
                         />
                       </td>
                     ))}
 
                     <td className="px-3 py-3 text-center font-semibold tabular-nums text-[#861F41]">
-                      {formatCaptionScore(penaltyTotals[row.entryId] ?? 0)}
+                      {captionText(penaltyTotals[row.entryId] ?? 0)}
                     </td>
                     <td className="px-3 py-3 text-center font-bold tabular-nums text-[#002144]"
                       title={`Round deduction: ${formula.penalty}; individual penalties: ${penaltyTotals[row.entryId] ?? 0}`}>
-                      {formatTotalScore(calculated)}
+                      {scoreText(calculated)}
                     </td>
 
                     <td className="px-3 py-3">
@@ -915,7 +950,7 @@ export default function LiveResultsSpreadsheet({
                         />
                       ) : (
                         <span className="block min-w-24 rounded-md bg-emerald-50 px-3 py-2 text-center font-bold tabular-nums text-emerald-900">
-                          {formatTotalScore(total)}
+                          {scoreText(total)}
                         </span>
                       )}
                     </td>
@@ -992,11 +1027,9 @@ export default function LiveResultsSpreadsheet({
             </tbody>
           </table>
 
-          {rows.length === 0 && (
+          {displayedRows.length === 0 && (
             <div className="p-10 text-center text-sm text-slate-600">
-              No bands are entered in this round.
-              Use the Individual Results Editor
-              to add ensembles before entering scores.
+              {rows.length === 0 ? "No ensembles are entered in this round. Use the Individual Results Editor to add them." : "No ensembles match the selected filters."}
             </div>
           )}
         </div>
@@ -1018,7 +1051,7 @@ export default function LiveResultsSpreadsheet({
           </div>
         )}
 
-        <div className="flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-slate-200 bg-white p-5">
+        <div className="sticky bottom-3 z-20 flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-slate-200 bg-white/95 p-5 shadow-xl backdrop-blur">
           <div>
             <p className="font-semibold text-[#002144]">
               {dirty.length} modified{" "}
