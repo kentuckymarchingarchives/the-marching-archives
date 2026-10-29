@@ -26,7 +26,7 @@ export default function SiteHeader() {
           className="flex min-w-0 items-center gap-3"
           onClick={() => setOpen(false)}
         >
-          <span className="flex h-72px w-72px shrink-0 items-center justify-center">
+          <span className="flex h-18 w-18 shrink-0 items-center justify-center">
             <Image
               src="/tma-logo.png"
               alt="The Marching Archives logo"
