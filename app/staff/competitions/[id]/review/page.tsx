@@ -264,6 +264,26 @@ async function ReviewContent({ params }: Props) {
     }
   }
 
+  // Reviewed citations support manual verification; their presence does not
+  // certify each score or replace the existing publication approval workflow.
+  const { data: citationRows, error: citationError } = await supabase
+    .from("competition_sources")
+    .select("id, title, source_type, url, citation, reviewed_at")
+    .eq("competition_id", id)
+    .order("created_at", { ascending: false })
+    .limit(501);
+
+  if (citationError) {
+    throw new Error(
+      "Unable to load competition citations. Ensure the source-management migration has been applied."
+    );
+  }
+
+  const sourceRecords = citationRows ?? [];
+  const sourcesTruncated = sourceRecords.length > 500;
+  const reviewedRecords = sourceRecords.filter((source) => Boolean(source.reviewed_at));
+  const pendingRecords = sourceRecords.filter((source) => !source.reviewed_at);
+
   const findings = analyzeCompetition({
     competition,
     rounds,
@@ -476,6 +496,25 @@ async function ReviewContent({ params }: Props) {
             />
           ))}
         </div>
+      </section>
+
+      <section className="rounded-2xl border border-slate-200 bg-white p-6 md:p-8" aria-labelledby="citations-review-heading">
+        <div className="flex flex-wrap items-center justify-between gap-4">
+          <div>
+            <p className="text-xs font-bold uppercase tracking-widest text-[#861F41]">Historical evidence</p>
+            <h2 id="citations-review-heading" className="mt-2 text-2xl font-bold text-[#002144]">Citation Review</h2>
+            <p className="mt-2 text-sm text-slate-600">Reviewed citations are evidence references, not an automatic certification of scores.</p>
+          </div>
+          <Link href={`/staff/competitions/${id}/sources`} className="rounded-lg bg-[#861F41] px-4 py-2.5 text-sm font-bold text-white hover:bg-[#6d1733]">Manage Sources →</Link>
+        </div>
+        <div className="mt-5 grid gap-3 sm:grid-cols-3">
+          <div className="rounded-xl bg-slate-50 p-4"><p className="text-sm text-slate-600">Recorded</p><p className="mt-1 text-2xl font-bold tabular-nums text-[#002144]">{sourceRecords.length}{sourcesTruncated ? "+" : ""}</p></div>
+          <div className="rounded-xl bg-emerald-50 p-4"><p className="text-sm text-emerald-800">Reviewed</p><p className="mt-1 text-2xl font-bold tabular-nums text-emerald-900">{reviewedRecords.length}{sourcesTruncated ? "+" : ""}</p></div>
+          <div className="rounded-xl bg-amber-50 p-4"><p className="text-sm text-amber-800">Pending</p><p className="mt-1 text-2xl font-bold tabular-nums text-amber-900">{pendingRecords.length}{sourcesTruncated ? "+" : ""}</p></div>
+        </div>
+        {sourcesTruncated && <p className="mt-4 text-sm font-semibold text-amber-800">More than 500 references exist; counts are partial. Open Manage Sources to review the full record.</p>}
+        {reviewedRecords.length === 0 && <p className="mt-4 rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">No reviewed citations recorded. Verify sources before approving publication.</p>}
+        {reviewedRecords.length > 0 && <ul className="mt-5 space-y-2">{reviewedRecords.slice(0, 8).map((source) => <li key={source.id} className="rounded-lg border border-slate-200 px-4 py-3 text-sm text-slate-700"><span className="font-semibold text-[#002144]">{source.title}</span><span className="ml-2 text-xs text-emerald-800">Reviewed</span></li>)}</ul>}
       </section>
 
       <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white" aria-labelledby="source-review-title">
