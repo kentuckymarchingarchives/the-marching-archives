@@ -1,6 +1,7 @@
 import { Suspense } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
+import HeadToHeadHistory from "@/components/HeadToHeadHistory";
 
 type Params = { left?: string; right?: string };
 type Props = { searchParams: Promise<Params> };
@@ -141,6 +142,7 @@ async function CompareContent({ searchParams }: Props) {
                 </div>
               ))}
             </section>
+            <HeadToHeadHistory left={first.band} right={second.band} />
             <p className="rounded-xl border border-slate-200 bg-white p-5 text-sm leading-7 text-slate-600">Figures count published round entries, not unique competition events. Results depend on available archival coverage. Raw total scores are intentionally not compared across organizations or seasons because their judging scales may differ. Championship-finals appearances do not establish official championship titles.</p>
           </>
         ) : (
