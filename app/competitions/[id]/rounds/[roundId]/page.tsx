@@ -133,7 +133,7 @@ function ResultsTable({
 }) {
   return (
     <div className="overflow-x-auto rounded-2xl border border-slate-200 bg-white shadow-sm ring-1 ring-slate-100">
-      <table className="w-full min-w-[720px] text-left text-sm">
+      <table className="w-full 180 text-left text-sm">
         <thead className="bg-slate-100 text-[#002144]">
           <tr>
             <th scope="col" className="px-5 py-4">
@@ -675,7 +675,7 @@ async function RoundContent({ params }: Props) {
 
                   {captions.length > 0 ? (
                     <div className="overflow-x-auto rounded-xl border border-slate-200">
-                      <table className="w-full min-w-[460px] text-left text-sm">
+                      <table className="w-full min-w-115 text-left text-sm">
                         <thead className="bg-[#002144] text-white">
                           <tr>
                             <th className="px-4 py-3">Caption</th>
