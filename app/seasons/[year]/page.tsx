@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { Suspense } from "react";
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { competitionPublicUrl } from "@/lib/public-competition-routes";
@@ -29,7 +30,7 @@ function typeLabel(value: string | null) {
   return value ? value.replaceAll("_", " ").replace(/\b\w/g, (c) => c.toUpperCase()) : "Competition";
 }
 
-export default async function SeasonYearPage({ params, searchParams }: Props) {
+async function SeasonYearContent({ params, searchParams }: Props) {
   const [{ year: yearText }, filters] = await Promise.all([params, searchParams]);
   if (!/^\d{4}$/.test(yearText)) notFound();
   const year = Number(yearText);
@@ -77,4 +78,13 @@ export default async function SeasonYearPage({ params, searchParams }: Props) {
       <div className="mt-12 border-t border-slate-200 pt-7 text-sm"><Link className="font-semibold text-[#861F41]" href="/seasons">← Browse another season</Link> <span className="mx-2 text-slate-300">|</span> <Link className="font-semibold text-[#861F41]" href={`/competitions?year=${year}${organization ? `&organization=${organization}` : ""}`}>Advanced competition filters →</Link></div>
     </div>
   </main>;
+}
+
+
+export default function SeasonYearPage(props: Props) {
+  return (
+    <Suspense fallback={<main className="min-h-screen bg-[#f6f7f9]"><div className="mx-auto max-w-6xl px-5 py-16 text-slate-600">Loading season results…</div></main>}>
+      <SeasonYearContent {...props} />
+    </Suspense>
+  );
 }

@@ -1,5 +1,6 @@
 
 import type { Metadata } from "next";
+import { Suspense } from "react";
 import {
   Geist,
   Geist_Mono,
@@ -39,7 +40,9 @@ export default function RootLayout({
       <body
         className={`${geistSans.variable} ${geistMono.variable} flex min-h-screen flex-col antialiased`}
       >
-        <SiteHeader />
+        <Suspense fallback={<div className="h-20 border-b border-slate-200 bg-white" aria-hidden="true" />}>
+          <SiteHeader />
+        </Suspense>
 
         <div className="flex-1">
           {children}
