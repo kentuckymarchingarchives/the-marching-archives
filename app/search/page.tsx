@@ -317,6 +317,7 @@ function SearchForm({ filters }: { filters: Filters }) {
             Location filters both. Former ensemble names are included when recorded.
           </p>
         </details>
+        <p className="text-sm text-slate-600">Looking for a specific score or placement? <Link href="/search/results" className="font-bold text-[#861F41] underline underline-offset-4">Search individual competition results →</Link></p>
         <div className="flex flex-wrap items-center gap-3">
           <button type="submit" className="rounded-xl bg-[#861F41] px-7 py-3.5 text-sm font-extrabold text-white transition hover:bg-[#6d1733]">Search archive →</button>
           <Link href="/search" className="rounded-xl border border-slate-300 bg-white px-6 py-3.5 text-sm font-bold text-[#002144] hover:bg-slate-50">Reset filters</Link>
