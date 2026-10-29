@@ -1,3 +1,4 @@
+import { formatTotalScore } from "@/lib/score-format";
 
 import Link from "next/link";
 
@@ -40,21 +41,6 @@ type Appearance = {
   round: Round;
   competition: Competition;
 };
-
-function scoreText(
-  value: number | string | null
-): string {
-  if (value === null || value === undefined) return "—";
-
-  const number = Number(value);
-
-  if (!Number.isFinite(number)) return "—";
-
-  return number
-    .toFixed(4)
-    .replace(/0+$/, "")
-    .replace(/\.$/, "");
-}
 
 function rankText(
   value: number | null,
@@ -417,7 +403,7 @@ export default async function BandCompetitionHistory({
                 </div>
 
                 <div className="overflow-x-auto rounded-2xl border border-slate-200 bg-white shadow-sm">
-                  <table className="w-full min-w-[790px] text-left text-sm">
+                  <table className="w-full min-w-197.5 text-left text-sm">
                     <thead className="bg-[#002144] text-white">
                       <tr>
                         <th scope="col" className="px-5 py-4">
@@ -527,7 +513,7 @@ export default async function BandCompetitionHistory({
                             </td>
 
                             <td className="px-5 py-5 text-right font-bold tabular-nums text-[#002144]">
-                              {scoreText(entry.total_score)}
+                              {formatTotalScore(entry.total_score)}
                             </td>
                           </tr>
                         );

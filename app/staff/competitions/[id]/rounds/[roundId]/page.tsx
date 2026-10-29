@@ -1,3 +1,4 @@
+import { formatTotalScore, formatCaptionScore } from "@/lib/score-format";
 
 import { Suspense } from "react";
 import Link from "next/link";
@@ -40,14 +41,6 @@ const messages: Record<string, string> = {
   removed:
     "Band removed from this round. Its band profile and other competition results were not changed.",
 };
-
-function displayScore(value: number | string | null) {
-  if (value === null || value === undefined) {
-    return "—";
-  }
-
-  return Number(value).toFixed(3);
-}
 
 async function ResultsContent({
   params,
@@ -406,7 +399,7 @@ async function ResultsContent({
         </div>
 
         <div className="overflow-x-auto rounded-2xl border border-slate-200 bg-white">
-          <table className="w-full min-w-[650px] text-left text-sm">
+          <table className="w-full min-w-162.50 text-left text-sm">
             <thead className="bg-[#002144] text-white">
               <tr>
                 <th className="px-5 py-4">Overall</th>
@@ -471,7 +464,7 @@ async function ResultsContent({
                     </td>
 
                     <td className="px-5 py-4 text-right font-bold tabular-nums text-[#002144]">
-                      {displayScore(entry.total_score)}
+                      {formatTotalScore(entry.total_score)}
                     </td>
 
                     <td className="px-5 py-4 text-right">
@@ -1116,7 +1109,7 @@ async function ResultsContent({
                             />
 
                             <span className="mt-1 block text-xs font-normal text-slate-500">
-                              Max: {caption.max_score}
+                              Max: {formatCaptionScore(caption.max_score)}
                             </span>
                           </label>
                         ))}

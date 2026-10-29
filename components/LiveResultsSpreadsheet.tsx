@@ -1,5 +1,7 @@
 "use client";
 
+import { formatTotalScore, formatCaptionScore } from "@/lib/score-format";
+
 import {
   useActionState,
   useEffect,
@@ -93,15 +95,6 @@ function officialTotal(
   return row.totalMode === "manual"
     ? parseScore(row.manualTotal)
     : calculatedTotal(row, captions, formula, penaltyTotals);
-}
-
-function scoreText(value: number | null): string {
-  if (value === null) return "—";
-
-  return value
-    .toFixed(4)
-    .replace(/0+$/, "")
-    .replace(/\.$/, "");
 }
 
 type RankedRecord = {
@@ -735,7 +728,7 @@ export default function LiveResultsSpreadsheet({
                     </span>
 
                     <span className="mt-1 block text-xs font-normal text-slate-300">
-                      Max {caption.max_score}
+                      Max {formatCaptionScore(caption.max_score)}
                       {" · "}×{caption.multiplier}
                     </span>
                   </th>
@@ -871,11 +864,11 @@ export default function LiveResultsSpreadsheet({
                     ))}
 
                     <td className="px-3 py-3 text-center font-semibold tabular-nums text-[#861F41]">
-                      {(penaltyTotals[row.entryId] ?? 0).toFixed(4)}
+                      {formatCaptionScore(penaltyTotals[row.entryId] ?? 0)}
                     </td>
                     <td className="px-3 py-3 text-center font-bold tabular-nums text-[#002144]"
                       title={`Round deduction: ${formula.penalty}; individual penalties: ${penaltyTotals[row.entryId] ?? 0}`}>
-                      {scoreText(calculated)}
+                      {formatTotalScore(calculated)}
                     </td>
 
                     <td className="px-3 py-3">
@@ -922,7 +915,7 @@ export default function LiveResultsSpreadsheet({
                         />
                       ) : (
                         <span className="block min-w-24 rounded-md bg-emerald-50 px-3 py-2 text-center font-bold tabular-nums text-emerald-900">
-                          {scoreText(total)}
+                          {formatTotalScore(total)}
                         </span>
                       )}
                     </td>
