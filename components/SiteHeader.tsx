@@ -17,31 +17,30 @@ export default function SiteHeader() {
   const [open, setOpen] = useState(false);
 
   return (
-    <header className="site-header sticky top-0 z-50 border-b border-slate-200/80 bg-white/95 shadow-sm backdrop-blur-xl">
-      <div className="mx-auto flex h-24 max-w-7xl items-center justify-between gap-5 px-5 md:px-8">
-
+    <header className="sticky top-0 z-50 border-b border-slate-200 bg-white shadow-sm">
+      <div className="mx-auto flex h-20 max-w-7xl items-center justify-between gap-4 px-5 md:px-8">
         {/* Logo and Website Name */}
         <Link
           href="/"
-          className="flex min-w-0 items-center gap-3"
+          className="flex min-w-0 shrink-0 items-center gap-3"
           onClick={() => setOpen(false)}
         >
-          <span className="flex h-18 w-18 shrink-0 items-center justify-center">
+          <span className="flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden">
             <Image
               src="/tma-logo.png"
               alt="The Marching Archives logo"
-              width={72}
-              height={72}
-              className="h-full w-full object-contain"
+              width={56}
+              height={56}
+              className="h-14 w-14 object-contain"
               priority
             />
           </span>
 
           <span className="min-w-0">
-            <strong className="block truncate text-[15px] font-extrabold tracking-tight text-[#002144] sm:text-xl">
+            <strong className="block text-[15px] font-extrabold tracking-tight text-[#002144] sm:text-xl">
               The Marching Archives
             </strong>
-            <span className="block text-[10px] font-semibold uppercase tracking-[.15em] text-slate-500 sm:text-xs">
+            <span className="block text-[9px] font-semibold uppercase tracking-[0.12em] text-slate-500 sm:text-xs">
               Competitive History, Preserved
             </span>
           </span>
@@ -62,9 +61,9 @@ export default function SiteHeader() {
                 key={link.href}
                 href={link.href}
                 aria-current={isActive ? "page" : undefined}
-                className={`rounded-lg px-4 py-2.5 text-sm font-semibold transition ${
+                className={`rounded-lg px-3 py-2.5 text-sm font-semibold transition ${
                   isActive
-                    ? "bg-[#002144]/[.07] text-[#002144]"
+                    ? "bg-[#002144]/[0.07] text-[#002144]"
                     : "text-slate-600 hover:bg-slate-100 hover:text-[#002144]"
                 }`}
               >
@@ -75,9 +74,6 @@ export default function SiteHeader() {
 
           <Link
             href="/search"
-            aria-current={
-              pathname.startsWith("/search") ? "page" : undefined
-            }
             className="ml-2 rounded-lg bg-[#861F41] px-5 py-2.5 text-sm font-bold text-white transition hover:bg-[#6d1733]"
           >
             Search Archive ↗
@@ -138,7 +134,7 @@ export default function SiteHeader() {
                   aria-current={isActive ? "page" : undefined}
                   className={`rounded-lg px-4 py-3 font-semibold transition ${
                     isActive
-                      ? "bg-[#002144]/[.07] text-[#002144]"
+                      ? "bg-[#002144]/[0.07] text-[#002144]"
                       : "text-slate-700 hover:bg-slate-100"
                   }`}
                 >
