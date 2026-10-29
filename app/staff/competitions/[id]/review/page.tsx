@@ -286,6 +286,19 @@ async function ReviewContent({ params }: Props) {
     (finding) => finding.severity === "passed"
   );
 
+  const recordedSource = competition.source_url?.trim() ?? "";
+  let sourceLink: string | null = null;
+  if (recordedSource) {
+    try {
+      const candidate = new URL(recordedSource);
+      if (candidate.protocol === "http:" || candidate.protocol === "https:") {
+        sourceLink = candidate.href;
+      }
+    } catch {
+      // Invalid source URLs are surfaced as review warnings.
+    }
+  }
+
   const activeRoundCount = rounds.filter(
     (round) => !round.archived_at
   ).length;
@@ -465,51 +478,84 @@ async function ReviewContent({ params }: Props) {
         </div>
       </section>
 
-      <section className="rounded-2xl border border-slate-200 bg-white p-7">
-        <h2 className="text-2xl font-bold text-[#002144]">
-          Manual Historical Verification
-        </h2>
-
-        <p className="mt-3 text-sm leading-7 text-slate-600">
-          Automated checks cannot confirm that
-          historical scores are genuine or that
-          all participating ensembles were included.
-          Staff should compare the results against
-          original programs, recap sheets, official
-          competition records, or another documented source.
-        </p>
-
-        {competition.source_url &&
-          /^https?:\/\//i.test(competition.source_url) && (
-            <a
-              href={competition.source_url}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="mt-4 inline-block text-sm font-bold text-[#861F41] underline"
-            >
-              Open Recorded Source →
-            </a>
-          )}
-
-        <div className="mt-6 rounded-xl bg-[#F4F6F9] p-5">
-          <p className="text-sm font-bold text-[#002144]">
-            Recommended manual checklist
+      <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white" aria-labelledby="source-review-title">
+        <div className="border-b border-slate-200 bg-[#002144] px-6 py-6 text-white sm:px-7">
+          <p className="text-xs font-bold uppercase tracking-widest text-[#eac0cd]">
+            Historical evidence
           </p>
-
-          <ul className="mt-3 list-disc space-y-2 pl-5 text-sm leading-6 text-slate-700">
-            <li>Confirm the event name, date, and location.</li>
-            <li>Confirm the participating bands in every round.</li>
-            <li>Compare reported totals and caption scores to the source.</li>
-            <li>Confirm class and overall placements, including ties.</li>
-            <li>Document penalties, disqualifications, or exceptions.</li>
-          </ul>
+          <h2 id="source-review-title" className="mt-2 text-2xl font-bold">
+            Source & Manual Verification
+          </h2>
+          <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-200">
+            Automated review checks the structure of the record, not its historical accuracy.
+            Staff must compare the entries and scores against trustworthy source material.
+          </p>
         </div>
 
-        <p className="mt-5 text-xs leading-6 text-slate-500">
-          This checklist is guidance only. Phase 7.2
-          will introduce recorded approval and publishing.
-          No approval is stored by this page.
-        </p>
+        <div className="space-y-7 p-6 sm:p-7">
+          <div className="flex flex-wrap items-start justify-between gap-4 rounded-xl border border-slate-200 bg-[#f6f7f9] p-5">
+            <div className="min-w-0 flex-1">
+              <p className="text-xs font-bold uppercase tracking-wider text-slate-500">
+                Recorded online source
+              </p>
+              <p className="mt-2 font-semibold text-[#002144]">
+                {sourceLink
+                  ? "Source link recorded — manual verification needed"
+                  : recordedSource
+                    ? "Recorded link is invalid"
+                    : "No online source recorded"}
+              </p>
+              <p className="mt-2 text-sm leading-6 text-slate-600">
+                {sourceLink
+                  ? "Open the source and confirm it actually contains the event results. A URL alone is not proof of accuracy."
+                  : recordedSource
+                    ? "Update this competition with a complete http:// or https:// source URL."
+                    : "If the source is an offline program or recap sheet, retain its citation in your existing documentation workflow."}
+              </p>
+              {recordedSource && (
+                <p className="mt-2 break-all text-xs text-slate-500">
+                  {recordedSource}
+                </p>
+              )}
+            </div>
+            {sourceLink && (
+              <a
+                href={sourceLink}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex shrink-0 rounded-lg bg-[#861F41] px-4 py-2.5 text-sm font-bold text-white hover:bg-[#6d1733]"
+              >
+                Open source ↗
+              </a>
+            )}
+          </div>
+
+          <div>
+            <h3 className="font-bold text-[#002144]">Manual review checklist</h3>
+            <ul className="mt-3 grid list-disc gap-3 pl-5 text-sm leading-6 text-slate-700 md:grid-cols-2 md:gap-x-9">
+              <li>Verify event name, date, and location.</li>
+              <li>Confirm every participating ensemble and its classification.</li>
+              <li>Compare caption scores and total scores to the source.</li>
+              <li>Check class and overall placements, including ties.</li>
+              <li>Verify penalties, disqualifications, and score corrections.</li>
+              <li>Confirm that each round is represented accurately.</li>
+            </ul>
+          </div>
+
+          <div className="border-t border-slate-200 pt-5">
+            <p className="text-sm leading-6 text-slate-600">
+              <strong className="text-[#002144]">Verification status:</strong>{" "}
+              This page does not record a manual approval or certify a result as verified.
+              Completing the checklist above is a staff review activity, not a saved sign-off.
+            </p>
+            <Link
+              href={`/staff/competitions/${id}`}
+              className="mt-4 inline-flex rounded-lg border border-slate-300 px-4 py-2.5 text-sm font-bold text-[#002144] hover:bg-slate-50"
+            >
+              Return to competition management →
+            </Link>
+          </div>
+        </div>
       </section>
 
       <div className="flex flex-wrap gap-3">
