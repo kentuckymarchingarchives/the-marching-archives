@@ -11,6 +11,14 @@ const navigation = [
     label: "Bands & Corps",
     href: "/bands",
   },
+  {
+    label: "Competitions",
+    href: "/competitions",
+  },
+  {
+    label: "Organizations",
+    href: "/organizations",
+  },
 ];
 
 export default function SiteHeader() {
@@ -23,18 +31,16 @@ export default function SiteHeader() {
           aria-label="The Marching Archives homepage"
           className="flex min-w-0 items-center gap-4"
         >
-          
-        <div className="flex h-24 w-24 shrink-0 items-center justify-center rounded-xl bg-white p-2 shadow-sm">
-        <Image
-            src="/tma-logo.png"
-            alt="The Marching Archives logo"
-            width={96}
-            height={96}
-            priority
-            className="h-full w-full object-contain"
-        />
-        </div>
-
+          <div className="flex h-20 w-20 shrink-0 items-center justify-center rounded-xl bg-white p-2 shadow-sm md:h-24 md:w-24">
+            <Image
+              src="/tma-logo.png"
+              alt="The Marching Archives logo"
+              width={96}
+              height={96}
+              priority
+              className="h-full w-full object-contain"
+            />
+          </div>
 
           <div className="min-w-0">
             <span className="block font-serif text-lg font-bold tracking-wide md:text-2xl">
@@ -62,6 +68,29 @@ export default function SiteHeader() {
             </Link>
           ))}
 
+          {/* Unified archive search */}
+          <Link
+            href="/search"
+            aria-label="Search The Marching Archives"
+            className="inline-flex items-center gap-2 rounded-lg border border-white/25 px-4 py-2.5 text-sm font-bold text-white transition-colors hover:border-white/50 hover:bg-white/10"
+          >
+            <svg
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              className="h-4 w-4"
+              aria-hidden="true"
+            >
+              <circle cx="11" cy="11" r="7" />
+              <path d="m16 16 5 5" />
+            </svg>
+            Search
+          </Link>
+
+          {/* Staff login */}
           <Link
             href="/staff/login"
             className="ml-1 rounded-lg bg-[#861F41] px-4 py-2.5 text-sm font-bold text-white transition-colors hover:bg-[#A02B52]"
