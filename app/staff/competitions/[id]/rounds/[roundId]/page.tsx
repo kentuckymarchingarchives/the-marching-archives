@@ -6,7 +6,6 @@ import { notFound, redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { UUID_PATTERN } from "@/lib/band-validation";
 import { organizationClasses } from "@/lib/competition-config";
-
 import ResultsScrollKeeper from "@/components/ResultsScrollKeeper";
 
 import {
@@ -14,6 +13,7 @@ import {
   addRoundCaption,
   updateRoundCaption,
   saveEntryResults,
+  removeRoundEntry,
 } from "@/app/staff/competitions/results-actions";
 
 export const instant = false;
@@ -37,6 +37,8 @@ const messages: Record<string, string> = {
   caption: "New scoring caption added.",
   caption_saved: "Caption settings updated.",
   saved: "Result and caption scores saved successfully.",
+  removed:
+    "Band removed from this round. Its band profile and other competition results were not changed.",
 };
 
 function displayScore(value: number | string | null) {
@@ -151,6 +153,7 @@ async function ResultsContent({
   const entryIds = (entries ?? []).map(
     (entry) => entry.id
   );
+
   const bandIds = (entries ?? []).map(
     (entry) => entry.band_id
   );
@@ -189,7 +192,9 @@ async function ResultsContent({
   ]);
 
   if (bandsError || scoresError) {
-    throw new Error("Unable to load band or score details.");
+    throw new Error(
+      "Unable to load band or score details."
+    );
   }
 
   const bandMap = new Map(
@@ -244,14 +249,13 @@ async function ResultsContent({
     (band) => !enteredIds.has(band.id)
   );
 
-  // Count duplicate placements so shared ranks
-  // can be marked as ties.
   const overallCounts = new Map<number, number>();
   const classCounts = new Map<string, number>();
 
   for (const entry of entries ?? []) {
     if (entry.overall_placement !== null) {
       const rank = Number(entry.overall_placement);
+
       overallCounts.set(
         rank,
         (overallCounts.get(rank) ?? 0) + 1
@@ -321,7 +325,7 @@ async function ResultsContent({
         href={`/staff/competitions/${id}`}
         className="text-sm font-semibold text-[#861F41]"
       >
-        ← Competition Details
+        &larr; Competition Details
       </Link>
 
       <header>
@@ -389,12 +393,12 @@ async function ResultsContent({
         </div>
       </div>
 
-      {/* Compact results overview */}
       <section id="overview" className="scroll-mt-6 space-y-4">
         <div>
           <h2 className="text-2xl font-bold text-[#002144]">
             Results Overview
           </h2>
+
           <p className="mt-2 text-sm text-slate-600">
             Quick reference for all entered performances.
             Select Edit to jump to a band's scoring form.
@@ -409,8 +413,12 @@ async function ResultsContent({
                 <th className="px-5 py-4">Ensemble</th>
                 <th className="px-5 py-4">Class</th>
                 <th className="px-5 py-4">Class Rank</th>
-                <th className="px-5 py-4 text-right">Score</th>
-                <th className="px-5 py-4 text-right">Edit</th>
+                <th className="px-5 py-4 text-right">
+                  Score
+                </th>
+                <th className="px-5 py-4 text-right">
+                  Edit
+                </th>
               </tr>
             </thead>
 
@@ -471,7 +479,7 @@ async function ResultsContent({
                         href={`#entry-${entry.id}`}
                         className="font-semibold text-[#861F41] hover:underline"
                       >
-                        Edit ↓
+                        Edit &darr;
                       </a>
                     </td>
                   </tr>
@@ -498,6 +506,137 @@ async function ResultsContent({
           than calculating or adjusting them automatically.
         </p>
       </section>
+
+      {/* Phase 8.5.2 — Round lineup management */}
+      {isDraft && (
+        <section
+          id="lineup"
+          className="scroll-mt-6 space-y-5"
+        >
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <h2 className="text-2xl font-bold text-[#002144]">
+                Manage Round Lineup
+              </h2>
+
+              <p className="mt-2 text-sm text-slate-600">
+                Remove ensembles accidentally entered
+                into this round. Any scores and placements
+                recorded for that entry will also be deleted.
+              </p>
+            </div>
+
+            <span className="rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-bold text-[#002144]">
+              {resultRows.length} entered
+            </span>
+          </div>
+
+          <div className="divide-y divide-slate-100 rounded-2xl border border-slate-200 bg-white shadow-sm">
+            {resultRows.length > 0 ? (
+              resultRows.map((entry) => {
+                const band = bandMap.get(entry.band_id);
+                const bandName =
+                  band?.name ?? "Unknown Band";
+
+                const hasResults =
+                  entry.total_score !== null ||
+                  entry.class_placement !== null ||
+                  entry.overall_placement !== null ||
+                  (captionScores ?? []).some(
+                    (score) =>
+                      score.entry_id === entry.id
+                  );
+
+                return (
+                  <div key={entry.id} className="p-5">
+                    <div className="flex flex-wrap items-center justify-between gap-4">
+                      <div className="min-w-0">
+                        <p className="font-bold text-[#002144]">
+                          {bandName}
+                        </p>
+
+                        <p className="mt-1 text-xs text-slate-600">
+                          {entry.classification ??
+                            "Unclassified"}
+                          {hasResults
+                            ? " · Recorded results will be deleted"
+                            : " · No recorded scores or placements"}
+                        </p>
+                      </div>
+
+                      <details className="w-full sm:w-auto">
+                        <summary className="inline-flex cursor-pointer list-none items-center rounded-lg border border-red-300 bg-white px-4 py-2.5 text-sm font-bold text-red-800 hover:bg-red-50">
+                          Remove from Round
+                        </summary>
+
+                        <form
+                          action={removeRoundEntry}
+                          className="mt-3 w-full space-y-3 rounded-xl border border-red-200 bg-red-50 p-4 sm:w-96"
+                        >
+                          <input
+                            type="hidden"
+                            name="competition_id"
+                            value={id}
+                          />
+                          <input
+                            type="hidden"
+                            name="round_id"
+                            value={roundId}
+                          />
+                          <input
+                            type="hidden"
+                            name="entry_id"
+                            value={entry.id}
+                          />
+
+                          <p className="text-sm font-bold text-red-900">
+                            Remove {bandName} from{" "}
+                            {round.name}?
+                          </p>
+
+                          <p className="text-xs leading-6 text-red-900">
+                            The band remains in the TMA
+                            directory and other rounds.
+                            Scores, placements, notes, and
+                            caption scores associated with
+                            this round entry will be
+                            permanently deleted.
+                          </p>
+
+                          <label className="block text-xs font-bold text-red-900">
+                            Type REMOVE to confirm
+
+                            <input
+                              name="confirm_remove"
+                              type="text"
+                              required
+                              pattern="REMOVE"
+                              autoComplete="off"
+                              placeholder="REMOVE"
+                              className="mt-2 block w-full rounded-lg border border-red-300 bg-white px-3 py-2 text-sm text-[#002144]"
+                            />
+                          </label>
+
+                          <button
+                            type="submit"
+                            className="cursor-pointer rounded-lg bg-red-800 px-5 py-2.5 text-sm font-bold text-white hover:bg-red-900"
+                          >
+                            Confirm Removal
+                          </button>
+                        </form>
+                      </details>
+                    </div>
+                  </div>
+                );
+              })
+            ) : (
+              <p className="p-6 text-sm text-slate-600">
+                There are no bands in this round yet.
+              </p>
+            )}
+          </div>
+        </section>
+      )}
 
       {isDraft && (
         <section
@@ -551,6 +690,7 @@ async function ResultsContent({
 
             <label className="block text-sm font-semibold text-[#002144]">
               Band / Corps *
+
               <select
                 name="band_id"
                 required
@@ -558,9 +698,15 @@ async function ResultsContent({
                 key={bandSearch}
                 className={inputClass}
               >
-                <option value="">Choose an ensemble</option>
+                <option value="">
+                  Choose an ensemble
+                </option>
+
                 {availableBands.map((band) => (
-                  <option key={band.id} value={band.id}>
+                  <option
+                    key={band.id}
+                    value={band.id}
+                  >
                     {band.name}
                   </option>
                 ))}
@@ -569,12 +715,16 @@ async function ResultsContent({
 
             <label className="block text-sm font-semibold text-[#002144]">
               Competition Classification
+
               <select
                 name="classification"
                 defaultValue={round.class_scope ?? ""}
                 className={inputClass}
               >
-                <option value="">Unclassified / Exhibition</option>
+                <option value="">
+                  Unclassified / Exhibition
+                </option>
+
                 {classes.map((classification) => (
                   <option
                     key={classification}
@@ -604,23 +754,26 @@ async function ResultsContent({
                 href="/staff/bands/new"
                 className="mt-2 inline-block text-sm font-semibold text-[#861F41]"
               >
-                Create a New Band Profile →
+                Create a New Band Profile &rarr;
               </Link>
             </div>
           </form>
         </section>
       )}
 
-      {/* Caption management */}
-      <section id="captions" className="scroll-mt-6 space-y-5">
+      <section
+        id="captions"
+        className="scroll-mt-6 space-y-5"
+      >
         <div>
           <h2 className="text-2xl font-bold text-[#002144]">
             Caption Management
           </h2>
 
           <p className="mt-2 text-sm text-slate-600">
-            Define and edit scoring captions for this round.
-            Enter values documented by the historical source.
+            Define and edit scoring captions for this
+            round. Enter values documented by the
+            historical source.
           </p>
         </div>
 
@@ -651,6 +804,7 @@ async function ResultsContent({
 
                 <label className="text-sm font-semibold text-[#002144]">
                   Caption
+
                   <input
                     name="name"
                     required
@@ -663,6 +817,7 @@ async function ResultsContent({
 
                 <label className="text-sm font-semibold text-[#002144]">
                   Maximum
+
                   <input
                     name="max_score"
                     type="number"
@@ -678,6 +833,7 @@ async function ResultsContent({
 
                 <label className="text-sm font-semibold text-[#002144]">
                   Multiplier
+
                   <input
                     name="multiplier"
                     type="number"
@@ -726,6 +882,7 @@ async function ResultsContent({
 
             <label className="text-sm font-semibold text-[#002144]">
               New Caption Name *
+
               <input
                 name="name"
                 required
@@ -737,6 +894,7 @@ async function ResultsContent({
 
             <label className="text-sm font-semibold text-[#002144]">
               Maximum Score *
+
               <input
                 name="max_score"
                 type="number"
@@ -751,6 +909,7 @@ async function ResultsContent({
 
             <label className="text-sm font-semibold text-[#002144]">
               Multiplier *
+
               <input
                 name="multiplier"
                 type="number"
@@ -775,8 +934,10 @@ async function ResultsContent({
         )}
       </section>
 
-      {/* Individual results */}
-      <section id="results" className="scroll-mt-6 space-y-5">
+      <section
+        id="results"
+        className="scroll-mt-6 space-y-5"
+      >
         <div>
           <h2 className="text-2xl font-bold text-[#002144]">
             Individual Results
@@ -833,7 +994,7 @@ async function ResultsContent({
                           href={`/bands/${band.slug}`}
                           className="mt-2 inline-block text-xs font-semibold text-[#861F41]"
                         >
-                          View Band Profile →
+                          View Band Profile &rarr;
                         </Link>
                       )}
                     </div>
@@ -851,6 +1012,7 @@ async function ResultsContent({
                   <div className="grid gap-4 md:grid-cols-4">
                     <label className="text-sm font-semibold text-[#002144]">
                       Classification
+
                       <select
                         name="classification"
                         defaultValue={
@@ -859,7 +1021,10 @@ async function ResultsContent({
                         disabled={!isDraft}
                         className={inputClass}
                       >
-                        <option value="">Unclassified</option>
+                        <option value="">
+                          Unclassified
+                        </option>
+
                         {classes.map((classification) => (
                           <option
                             key={classification}
@@ -873,6 +1038,7 @@ async function ResultsContent({
 
                     <label className="text-sm font-semibold text-[#002144]">
                       Total Score
+
                       <input
                         name="total_score"
                         type="number"
@@ -889,6 +1055,7 @@ async function ResultsContent({
 
                     <label className="text-sm font-semibold text-[#002144]">
                       Class Placement
+
                       <input
                         name="class_placement"
                         type="number"
@@ -904,6 +1071,7 @@ async function ResultsContent({
 
                     <label className="text-sm font-semibold text-[#002144]">
                       Overall Placement
+
                       <input
                         name="overall_placement"
                         type="number"
@@ -958,6 +1126,7 @@ async function ResultsContent({
 
                   <label className="block text-sm font-semibold text-[#002144]">
                     Result Notes
+
                     <textarea
                       name="notes"
                       rows={2}
@@ -982,7 +1151,7 @@ async function ResultsContent({
                         href="#overview"
                         className="text-sm font-semibold text-[#861F41]"
                       >
-                        Back to Results Overview ↑
+                        Back to Results Overview &uarr;
                       </a>
                     </div>
                   )}
@@ -997,8 +1166,9 @@ async function ResultsContent({
         )}
 
         <p className="text-xs text-slate-500">
-          Showing up to 500 entries. A later phase
-          will add pagination and bulk importing.
+          Showing up to 500 entries. For large
+          competitions, use the existing Round Tools
+          page for bulk results management.
         </p>
       </section>
     </div>

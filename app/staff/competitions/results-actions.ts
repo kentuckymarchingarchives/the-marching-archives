@@ -22,10 +22,7 @@ function getId(form: FormData, key: string): string {
   return value;
 }
 
-function decimal(
-  input: string,
-  label: string
-): number | null {
+function decimal(input: string, label: string): number | null {
   if (input === "") return null;
 
   if (!/^\d+(?:\.\d{1,4})?$/.test(input)) {
@@ -461,6 +458,70 @@ export async function saveEntryResults(form: FormData) {
       roundId,
       "saved",
       `entry-${entryId}`
+    )
+  );
+}
+
+/**
+ * Remove one lineup entry without deleting the band
+ * or any of its appearances in other rounds.
+ */
+export async function removeRoundEntry(form: FormData) {
+  const competitionId = getId(form, "competition_id");
+  const roundId = getId(form, "round_id");
+  const entryId = getId(form, "entry_id");
+
+  if (read(form, "confirm_remove") !== "REMOVE") {
+    throw new Error("Type REMOVE to confirm lineup removal.");
+  }
+
+  const { supabase } =
+    await requireDraftRound(competitionId, roundId);
+
+  const { data: entry, error: entryError } = await supabase
+    .from("competition_entries")
+    .select("id")
+    .eq("id", entryId)
+    .eq("round_id", roundId)
+    .maybeSingle();
+
+  if (entryError || !entry) {
+    throw new Error(
+      "This band is no longer entered in this round."
+    );
+  }
+
+  // Reuse the existing protected deletion function.
+  // This must never delete the actual band profile.
+  const { error } = await supabase.rpc(
+    "tma_delete_round_entry",
+    {
+      p_round_id: roundId,
+      p_entry_id: entryId,
+    }
+  );
+
+  if (error) {
+    console.error("Remove round entry:", error.message);
+    throw new Error(
+      `Unable to remove the band: ${error.message}`
+    );
+  }
+
+  refresh(competitionId, roundId);
+  revalidatePath(`/staff/competitions/${competitionId}`);
+  revalidatePath(
+    `/staff/competitions/${competitionId}/rounds/${roundId}/tools`
+  );
+  revalidatePath(`/staff/competitions/${competitionId}/review`);
+  revalidatePath(`/staff/competitions/${competitionId}/publish`);
+
+  redirect(
+    returnUrl(
+      competitionId,
+      roundId,
+      "removed",
+      "lineup"
     )
   );
 }
