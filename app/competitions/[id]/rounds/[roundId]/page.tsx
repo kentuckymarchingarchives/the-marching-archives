@@ -132,9 +132,9 @@ function ResultsTable({
   supabaseUrl: string;
 }) {
   return (
-    <div className="overflow-x-auto rounded-2xl border border-slate-200 bg-white shadow-sm">
+    <div className="overflow-x-auto rounded-2xl border border-slate-200 bg-white shadow-sm ring-1 ring-slate-100">
       <table className="w-full min-w-[720px] text-left text-sm">
-        <thead className="bg-[#002144] text-white">
+        <thead className="bg-slate-100 text-[#002144]">
           <tr>
             <th scope="col" className="px-5 py-4">
               {mode === "overall" ? "Overall" : "Class Place"}
@@ -172,9 +172,9 @@ function ResultsTable({
             return (
               <tr
                 key={entry.id}
-                className="transition hover:bg-slate-50"
+                className="transition odd:bg-white even:bg-slate-50/60 hover:bg-[#861F41]/5"
               >
-                <td className="whitespace-nowrap px-5 py-4 font-bold text-[#002144]">
+                <td className="whitespace-nowrap px-5 py-4 text-base font-extrabold tabular-nums text-[#002144]">
                   {mode === "overall"
                     ? rankText(entry.overall_placement, tiedOverall)
                     : rankText(entry.class_placement, tiedClass)}
@@ -426,7 +426,7 @@ async function RoundContent({ params }: Props) {
     process.env.NEXT_PUBLIC_SUPABASE_URL ?? "";
 
   return (
-    <div className="mx-auto max-w-7xl space-y-10 px-6 py-10">
+    <div className="mx-auto max-w-7xl space-y-9 px-5 py-8 sm:px-8 sm:py-12">
       <nav className="flex flex-wrap gap-2 text-sm">
         <Link
           href="/competitions"
@@ -448,36 +448,29 @@ async function RoundContent({ params }: Props) {
         <span className="text-slate-600">{round.name}</span>
       </nav>
 
-      <header className="space-y-4">
-        <p className="text-xs font-bold uppercase tracking-widest text-[#861F41]">
-          {competition.organization_code}
-          {" · "}
-          {competition.season_year} Season
-        </p>
-
-        <p className="text-lg font-semibold text-[#002144]">
-          {competition.name}
-        </p>
-
-        <h1 className="font-serif text-4xl font-bold text-[#002144] md:text-5xl">
-          {round.name} Results
-        </h1>
-
-        <p className="text-sm text-slate-600">
-          {[
-            competition.city,
-            competition.state,
-            competition.country,
-          ]
-            .filter(Boolean)
-            .join(", ") || "Location not recorded"}
-        </p>
-
-        {round.class_scope && (
-          <p className="font-semibold text-[#861F41]">
-            Class {round.class_scope}
+      <header className="relative overflow-hidden rounded-3xl bg-[#002144] p-7 text-white shadow-lg sm:p-10">
+        <div aria-hidden="true" className="pointer-events-none absolute -right-16 -top-24 h-72 w-72 rounded-full bg-[#861F41]/50 blur-3xl" />
+        <div className="relative">
+          <p className="text-xs font-bold uppercase tracking-[0.18em] text-rose-200">
+            {competition.organization_code} · {competition.season_year} Season
           </p>
-        )}
+          <p className="mt-5 text-sm font-semibold text-slate-200">
+            {competition.name}
+          </p>
+          <h1 className="mt-2 max-w-4xl text-3xl font-extrabold tracking-tight sm:text-5xl">
+            {round.name} <span className="text-[#efb1c5]">Results</span>
+          </h1>
+          <div className="mt-6 flex flex-wrap gap-2 text-sm text-slate-200">
+            <span className="rounded-full border border-white/20 bg-white/10 px-3 py-1.5">
+              {[competition.city, competition.state, competition.country].filter(Boolean).join(", ") || "Location not recorded"}
+            </span>
+            {round.class_scope && (
+              <span className="rounded-full border border-white/20 bg-white/10 px-3 py-1.5">
+                Class {round.class_scope}
+              </span>
+            )}
+          </div>
+        </div>
       </header>
 
       {incomplete && (
@@ -504,7 +497,7 @@ async function RoundContent({ params }: Props) {
         ].map(([title, value]) => (
           <div
             key={String(title)}
-            className="rounded-xl border border-slate-200 bg-white p-6"
+            className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm"
           >
             <p className="text-xs font-semibold uppercase text-slate-500">
               {title}
@@ -516,36 +509,29 @@ async function RoundContent({ params }: Props) {
         ))}
       </section>
 
-      <nav className="flex flex-wrap gap-3">
-        <a
-          href="#overall"
-          className="cursor-pointer rounded-lg bg-[#002144] px-5 py-3 text-sm font-bold text-white"
-        >
+      <nav aria-label="Results sections" className="flex flex-wrap gap-2 rounded-2xl border border-slate-200 bg-white p-3 shadow-sm">
+        <a href="#overall" className="rounded-xl bg-[#002144] px-5 py-3 text-sm font-bold text-white transition hover:bg-[#153e64]">
           Overall Results
         </a>
-
         {classes.length > 0 && (
-          <a
-            href="#classes"
-            className="cursor-pointer rounded-lg bg-[#861F41] px-5 py-3 text-sm font-bold text-white"
-          >
+          <a href="#classes" className="rounded-xl bg-[#861F41] px-5 py-3 text-sm font-bold text-white transition hover:bg-[#a02e55]">
             Class Results
           </a>
         )}
-
-        <a
-          href="#details"
-          className="cursor-pointer rounded-lg border border-slate-300 bg-white px-5 py-3 text-sm font-bold text-[#002144]"
-        >
+        <a href="#details" className="rounded-xl border border-slate-200 bg-slate-50 px-5 py-3 text-sm font-bold text-[#002144] transition hover:bg-slate-100">
           Caption Breakdowns
+        </a>
+        <a href="#sources" className="rounded-xl border border-slate-200 bg-white px-5 py-3 text-sm font-bold text-slate-600 transition hover:bg-slate-50">
+          Sources
         </a>
       </nav>
 
-      <section id="overall" className="scroll-mt-8 space-y-5">
-        <h2 className="font-serif text-3xl font-bold text-[#002144]">
+      <section id="overall" className="scroll-mt-28 space-y-5">
+        <h2 className="text-2xl font-extrabold tracking-tight text-[#002144] sm:text-3xl">
           Overall Results
         </h2>
 
+        <p className="text-sm leading-6 text-slate-500">Browse all recorded placements. Select Score Details on any ensemble to see individual caption scores.</p>
         <ResultsTable
           entries={overall}
           bands={bands}
@@ -557,8 +543,8 @@ async function RoundContent({ params }: Props) {
       </section>
 
       {classes.length > 0 && (
-        <section id="classes" className="scroll-mt-8 space-y-7">
-          <h2 className="font-serif text-3xl font-bold text-[#002144]">
+        <section id="classes" className="scroll-mt-28 space-y-7">
+          <h2 className="text-2xl font-extrabold tracking-tight text-[#002144] sm:text-3xl">
             Class Results
           </h2>
 
@@ -597,8 +583,8 @@ async function RoundContent({ params }: Props) {
         </section>
       )}
 
-      <section id="details" className="scroll-mt-8 space-y-5">
-        <h2 className="font-serif text-3xl font-bold text-[#002144]">
+      <section id="details" className="scroll-mt-28 space-y-5">
+        <h2 className="text-2xl font-extrabold tracking-tight text-[#002144] sm:text-3xl">
           Individual Score Breakdowns
         </h2>
 
@@ -614,9 +600,9 @@ async function RoundContent({ params }: Props) {
               <details
                 key={entry.id}
                 id={`details-${entry.id}`}
-                className="scroll-mt-8 rounded-2xl border border-slate-200 bg-white shadow-sm"
+                className="group scroll-mt-28 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm open:border-[#861F41]/40"
               >
-                <summary className="flex cursor-pointer list-none items-center gap-4 p-5 marker:hidden">
+                <summary className="flex cursor-pointer list-none items-center gap-4 p-5 transition hover:bg-slate-50 marker:hidden">
                   {band && (
                     <BandLogo
                       name={band.name}
@@ -639,8 +625,8 @@ async function RoundContent({ params }: Props) {
                     </p>
                   </div>
 
-                  <span className="text-sm font-bold text-[#861F41]">
-                    Details
+                  <span className="shrink-0 rounded-lg bg-[#861F41]/10 px-3 py-2 text-xs font-bold text-[#861F41] group-open:bg-[#861F41] group-open:text-white">
+                    View breakdown
                   </span>
                 </summary>
 
@@ -750,7 +736,7 @@ async function RoundContent({ params }: Props) {
         )}
       </section>
 
-      <section className="rounded-2xl border border-slate-200 bg-white p-7">
+      <section id="sources" className="scroll-mt-28 rounded-2xl border border-slate-200 bg-white p-7">
         <h2 className="text-2xl font-bold text-[#002144]">
           Sources &amp; Accuracy
         </h2>
