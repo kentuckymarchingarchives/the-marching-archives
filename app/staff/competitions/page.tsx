@@ -4,8 +4,6 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { readableLabel } from "@/lib/competition-config";
 
-export const dynamic = "force-dynamic";
-
 const PAGE_SIZE = 24;
 
 type Props = {
