@@ -4,9 +4,7 @@ import Link from "next/link";
 
 import { createClient } from "@/lib/supabase/server";
 import { BAND_KINDS } from "@/lib/band-validation";
-import {
-  competitionPublicUrl,
-} from "@/lib/public-competition-routes";
+import { competitionPublicUrl } from "@/lib/public-competition-routes";
 
 import BandLogo from "@/components/BandLogo";
 import OrganizationMark from "@/components/OrganizationMark";
@@ -17,36 +15,53 @@ const PAGE_SIZE = 12;
 
 const ORGANIZATIONS = ["KMEA", "MSBA", "BOA", "DCI"];
 
-type SearchParams = {
+const COMPETITION_TYPES = [
+  ["regular_season", "Regular Season"],
+  ["regular_competition", "Regular Competition"],
+  ["smbc", "State Marching Band Championships"],
+  ["championships", "Championships"],
+  ["regional", "Regional"],
+  ["super_regional", "Super Regional"],
+  ["grand_nationals", "Grand Nationals"],
+  ["world_championship", "World Championship"],
+] as const;
+
+type RawParams = {
   q?: string | string[];
   kind?: string | string[];
+  city?: string | string[];
   state?: string | string[];
   organization?: string | string[];
-  year?: string | string[];
+  type?: string | string[];
+  from?: string | string[];
+  to?: string | string[];
   bp?: string | string[];
   cp?: string | string[];
+  year?: string | string[];
 };
 
 type Props = {
-  searchParams: Promise<SearchParams>;
+  searchParams: Promise<RawParams>;
 };
 
-type FilterValues = {
+type Filters = {
   q: string;
   kind: string;
+  city: string;
   state: string;
   organization: string;
-  year: string;
+  type: string;
+  from: string;
+  to: string;
   bp: number;
   cp: number;
 };
 
-function first(value: string | string[] | undefined) {
-  return typeof value === "string"
-    ? value
-    : Array.isArray(value)
-      ? (value[0] ?? "")
-      : "";
+function first(
+  value: string | string[] | undefined
+): string {
+  if (typeof value === "string") return value;
+  return Array.isArray(value) ? (value[0] ?? "") : "";
 }
 
 function pageNumber(value: string): number {
@@ -59,13 +74,18 @@ function pageNumber(value: string): number {
     : 1;
 }
 
-function getFilters(input: SearchParams): FilterValues {
-  const rawKind = first(input.kind);
-  const rawOrg = first(input.organization);
-  const rawYear = first(input.year);
-  const rawState = first(input.state)
-    .trim()
-    .slice(0, 100);
+function validYear(value: string): string {
+  return /^\d{4}$/.test(value) &&
+    Number(value) >= 1800 &&
+    Number(value) <= 2200
+    ? value
+    : "";
+}
+
+function parseFilters(params: RawParams): Filters {
+  const rawKind = first(params.kind);
+  const rawType = first(params.type);
+  const rawOrg = first(params.organization);
 
   const kind = BAND_KINDS.some(
     (item) => item.value === rawKind
@@ -73,46 +93,59 @@ function getFilters(input: SearchParams): FilterValues {
     ? rawKind
     : "";
 
-  const organization = ORGANIZATIONS.includes(rawOrg)
-    ? rawOrg
+  const type = COMPETITION_TYPES.some(
+    (item) => item[0] === rawType
+  )
+    ? rawType
     : "";
 
-  const year =
-    /^\d{4}$/.test(rawYear) &&
-    Number(rawYear) >= 1800 &&
-    Number(rawYear) <= 2200
-      ? rawYear
-      : "";
-
   return {
-    q: first(input.q).trim().slice(0, 100),
+    q: first(params.q).trim().slice(0, 100),
     kind,
-    state: rawState,
-    organization,
-    year,
-    bp: pageNumber(first(input.bp)),
-    cp: pageNumber(first(input.cp)),
+    city: first(params.city).trim().slice(0, 100),
+    state: first(params.state).trim().slice(0, 100),
+    organization: ORGANIZATIONS.includes(rawOrg)
+      ? rawOrg
+      : "",
+    type,
+    from: validYear(
+      first(params.from) || first(params.year)
+    ),
+    to: validYear(
+      first(params.to) || first(params.year)
+    ),
+    bp: pageNumber(first(params.bp)),
+    cp: pageNumber(first(params.cp)),
   };
 }
 
-function escapedSearch(value: string): string {
+function escapeLike(value: string): string {
   return value.replace(/[%_\\]/g, "\\$&");
 }
 
-function formatKind(value: string): string {
-  const known = BAND_KINDS.find(
-    (item) => item.value === value
-  );
+function namePattern(value: string): string {
+  // Remove characters that could interfere with
+  // PostgREST's OR-filter grammar.
+  const safe = value.replace(/[(),"\\]/g, " ").trim();
 
+  return `%${escapeLike(safe)}%`;
+}
+
+function kindLabel(value: string): string {
   return (
-    known?.label ??
-    value
-      .replaceAll("_", " ")
-      .replace(/\b\w/g, (letter) => letter.toUpperCase())
+    BAND_KINDS.find((item) => item.value === value)?.label ??
+    value.replaceAll("_", " ")
   );
 }
 
-function readableDate(value: string | null): string {
+function competitionTypeLabel(value: string): string {
+  return (
+    COMPETITION_TYPES.find((item) => item[0] === value)?.[1] ??
+    value.replaceAll("_", " ")
+  );
+}
+
+function dateLabel(value: string | null): string {
   if (!value) return "Date not recorded";
 
   const date = new Date(`${value}T12:00:00Z`);
@@ -127,109 +160,113 @@ function readableDate(value: string | null): string {
   });
 }
 
-function resultPageUrl(
-  filters: FilterValues,
-  target: "bands" | "competitions",
+function searchUrl(
+  filters: Filters,
+  section: "bands" | "competitions",
   page: number
 ): string {
   const params = new URLSearchParams();
 
-  if (filters.q) params.set("q", filters.q);
-  if (filters.kind) params.set("kind", filters.kind);
-  if (filters.state) params.set("state", filters.state);
+  const stringFilters = {
+    q: filters.q,
+    kind: filters.kind,
+    city: filters.city,
+    state: filters.state,
+    organization: filters.organization,
+    type: filters.type,
+    from: filters.from,
+    to: filters.to,
+  };
 
-  if (filters.organization) {
-    params.set("organization", filters.organization);
+  for (const [key, value] of Object.entries(stringFilters)) {
+    if (value) params.set(key, value);
   }
 
-  if (filters.year) params.set("year", filters.year);
-
-  const bp = target === "bands" ? page : filters.bp;
-  const cp = target === "competitions" ? page : filters.cp;
+  const bp = section === "bands" ? page : filters.bp;
+  const cp = section === "competitions" ? page : filters.cp;
 
   if (bp > 1) params.set("bp", String(bp));
   if (cp > 1) params.set("cp", String(cp));
 
-  const anchor =
-    target === "bands" ? "#ensembles" : "#competitions";
-
-  return `/search?${params.toString()}${anchor}`;
+  return (
+    `/search?${params.toString()}` +
+    (section === "bands"
+      ? "#ensembles"
+      : "#competitions")
+  );
 }
 
 function Pagination({
   page,
-  total,
-  target,
+  count,
+  section,
   filters,
 }: {
   page: number;
-  total: number;
-  target: "bands" | "competitions";
-  filters: FilterValues;
+  count: number;
+  section: "bands" | "competitions";
+  filters: Filters;
 }) {
-  const pages = Math.ceil(total / PAGE_SIZE);
+  const pages = Math.ceil(count / PAGE_SIZE);
 
   if (pages <= 1) return null;
 
   return (
     <nav
-      aria-label={
-        target === "bands"
-          ? "Ensemble search result pages"
-          : "Competition search result pages"
-      }
-      className="mt-7 flex flex-wrap items-center justify-center gap-4"
+      aria-label={`${section} search pagination`}
+      className="flex flex-wrap items-center justify-center gap-4 pt-5"
     >
-      {page > 1 ? (
+      {page > 1 && (
         <Link
-          href={resultPageUrl(filters, target, page - 1)}
+          href={searchUrl(filters, section, page - 1)}
           className="rounded-lg border border-slate-300 bg-white px-5 py-3 text-sm font-bold text-[#002144] hover:bg-slate-50"
         >
           &larr; Previous
         </Link>
-      ) : (
-        <span />
       )}
 
       <span className="text-sm font-semibold tabular-nums text-[#002144]">
         Page {page} of {pages}
       </span>
 
-      {page < pages ? (
+      {page < pages && (
         <Link
-          href={resultPageUrl(filters, target, page + 1)}
+          href={searchUrl(filters, section, page + 1)}
           className="rounded-lg border border-slate-300 bg-white px-5 py-3 text-sm font-bold text-[#002144] hover:bg-slate-50"
         >
           Next &rarr;
         </Link>
-      ) : (
-        <span />
       )}
     </nav>
   );
 }
 
-function SearchFilters({ filters }: { filters: FilterValues }) {
-  const inputClass =
-    "mt-2 w-full rounded-lg border border-slate-300 bg-white px-4 py-3 text-sm text-[#002144] focus:border-[#861F41] focus:outline-none focus:ring-2 focus:ring-[#861F41]/20";
+const inputClass =
+  "mt-2 w-full rounded-lg border border-slate-300 bg-white px-4 py-3 text-sm text-[#002144] focus:border-[#861F41] focus:outline-none focus:ring-2 focus:ring-[#861F41]/20";
 
+function SearchForm({ filters }: { filters: Filters }) {
   return (
     <form
       method="get"
       action="/search"
       role="search"
-      className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm md:p-8"
+      className="space-y-6 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm md:p-8"
     >
-      <label className="block text-sm font-bold text-[#002144]">
-        Search The Marching Archives
+      <div>
+        <label
+          htmlFor="archive-q"
+          className="text-sm font-bold text-[#002144]"
+        >
+          Search Ensemble or Competition Names
+        </label>
 
         <div className="relative mt-2">
           <svg
             viewBox="0 0 24 24"
-            aria-hidden="true"
             fill="none"
             stroke="currentColor"
             strokeWidth="2"
+            aria-hidden="true"
             className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-400"
           >
             <circle cx="11" cy="11" r="7" />
@@ -237,32 +274,28 @@ function SearchFilters({ filters }: { filters: FilterValues }) {
           </svg>
 
           <input
-            name="q"
+            id="archive-q"
             type="search"
+            name="q"
             maxLength={100}
             defaultValue={filters.q}
-            placeholder="Search band or competition names..."
+            placeholder="Current band name, former band name, or event..."
             className={`${inputClass} mt-0 py-4 pl-12`}
           />
         </div>
-      </label>
+      </div>
 
-      <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-5 md:grid-cols-2 lg:grid-cols-4">
         <label className="text-sm font-semibold text-[#002144]">
           Ensemble Type
-
           <select
             name="kind"
             defaultValue={filters.kind}
             className={inputClass}
           >
             <option value="">All Ensemble Types</option>
-
             {BAND_KINDS.map((kind) => (
-              <option
-                key={kind.value}
-                value={kind.value}
-              >
+              <option key={kind.value} value={kind.value}>
                 {kind.label}
               </option>
             ))}
@@ -270,11 +303,20 @@ function SearchFilters({ filters }: { filters: FilterValues }) {
         </label>
 
         <label className="text-sm font-semibold text-[#002144]">
-          State / Province
+          City
+          <input
+            name="city"
+            maxLength={100}
+            defaultValue={filters.city}
+            placeholder="Example: Richmond"
+            className={inputClass}
+          />
+        </label>
 
+        <label className="text-sm font-semibold text-[#002144]">
+          State / Province
           <input
             name="state"
-            type="text"
             maxLength={100}
             defaultValue={filters.state}
             placeholder="Example: Kentucky"
@@ -284,19 +326,14 @@ function SearchFilters({ filters }: { filters: FilterValues }) {
 
         <label className="text-sm font-semibold text-[#002144]">
           Organization
-
           <select
             name="organization"
             defaultValue={filters.organization}
             className={inputClass}
           >
             <option value="">All Organizations</option>
-
             {ORGANIZATIONS.map((organization) => (
-              <option
-                key={organization}
-                value={organization}
-              >
+              <option key={organization} value={organization}>
                 {organization}
               </option>
             ))}
@@ -304,57 +341,127 @@ function SearchFilters({ filters }: { filters: FilterValues }) {
         </label>
 
         <label className="text-sm font-semibold text-[#002144]">
-          Competition Season
+          Competition Type
+          <select
+            name="type"
+            defaultValue={filters.type}
+            className={inputClass}
+          >
+            <option value="">All Competition Types</option>
+            {COMPETITION_TYPES.map(([value, label]) => (
+              <option key={value} value={value}>
+                {label}
+              </option>
+            ))}
+          </select>
+        </label>
 
+        <label className="text-sm font-semibold text-[#002144]">
+          Season From
           <input
-            name="year"
             type="number"
+            name="from"
             min={1800}
             max={2200}
-            defaultValue={filters.year}
-            placeholder="All Years"
+            placeholder="Earliest year"
+            defaultValue={filters.from}
+            className={inputClass}
+          />
+        </label>
+
+        <label className="text-sm font-semibold text-[#002144]">
+          Season Through
+          <input
+            type="number"
+            name="to"
+            min={1800}
+            max={2200}
+            placeholder="Latest year"
+            defaultValue={filters.to}
             className={inputClass}
           />
         </label>
       </div>
 
-      <div className="mt-6 flex flex-wrap items-center gap-3">
+      <div className="flex flex-wrap gap-3">
         <button
           type="submit"
-          className="inline-flex cursor-pointer items-center gap-2 rounded-lg bg-[#861F41] px-7 py-3 text-sm font-bold text-white transition hover:bg-[#701832]"
+          className="cursor-pointer rounded-lg bg-[#861F41] px-7 py-3 text-sm font-bold text-white hover:bg-[#701832]"
         >
-          Search Archive
-          <span aria-hidden="true">&rarr;</span>
+          Search Archive &rarr;
         </button>
 
         <Link
           href="/search"
           className="rounded-lg border border-slate-300 px-6 py-3 text-sm font-bold text-[#002144] hover:bg-slate-50"
         >
-          Clear Filters
+          Clear All Filters
         </Link>
       </div>
 
-      <p className="mt-5 text-xs leading-6 text-slate-500">
-        The name search applies to ensembles and competitions.
-        Ensemble Type filters only ensembles;
-        Organization and Season filter only competitions.
-        State / Province filters both.
+      <p className="text-xs leading-6 text-slate-500">
+        Ensemble Type applies to bands and drum corps.
+        Organization, Competition Type, and Season Range
+        apply to competitions. City and State apply to both.
+        Name search includes historical ensemble names
+        where they are recorded.
       </p>
     </form>
   );
 }
 
-async function SearchResults({ searchParams }: Props) {
-  const filters = getFilters(await searchParams);
-
+async function SearchContent({
+  searchParams,
+}: Props) {
+  const filters = parseFilters(await searchParams);
   const supabase = await createClient();
 
-  // Separate page numbers allow visitors to browse
-  // either result category without losing their place
-  // in the other.
   const bandFrom = (filters.bp - 1) * PAGE_SIZE;
-  const competitionFrom = (filters.cp - 1) * PAGE_SIZE;
+  const competitionFrom =
+    (filters.cp - 1) * PAGE_SIZE;
+
+  const invalidRange =
+    Boolean(filters.from && filters.to) &&
+    Number(filters.from) > Number(filters.to);
+
+  // Find alternate/historical names first.
+  // We use matching band IDs to extend the band search
+  // without requiring a new database function.
+  let historicalIds: string[] = [];
+  let historicalSearchUnavailable = false;
+  let historicalResultsLimited = false;
+
+  if (filters.q && !invalidRange) {
+    const safeQuery = filters.q
+      .replace(/[(),"\\]/g, " ")
+      .trim();
+
+    if (safeQuery) {
+      const { data, error } = await supabase
+        .from("band_names")
+        .select("band_id")
+        .ilike("name", `%${escapeLike(safeQuery)}%`)
+        .limit(501);
+
+      if (error) {
+        historicalSearchUnavailable = true;
+      } else {
+        historicalResultsLimited = (data?.length ?? 0) > 500;
+        historicalIds = [
+          ...new Set(
+            (data ?? [])
+              .slice(0, 500)
+              .map((record) => record.band_id)
+              .filter(
+                (id): id is string =>
+                  typeof id === "string" &&
+                  /^[0-9a-f-]{36}$/i.test(id)
+              )
+          ),
+        ];
+      }
+    }
+  }
 
   let bandsQuery = supabase
     .from("bands")
@@ -382,9 +489,15 @@ async function SearchResults({ searchParams }: Props) {
     .order("id", { ascending: true });
 
   if (filters.q) {
-    const pattern = `%${escapedSearch(filters.q)}%`;
+    const pattern = namePattern(filters.q);
 
-    bandsQuery = bandsQuery.ilike("name", pattern);
+    if (historicalIds.length > 0) {
+      bandsQuery = bandsQuery.or(
+        `name.ilike."${pattern}",id.in.(${historicalIds.join(",")})`
+      );
+    } else {
+      bandsQuery = bandsQuery.ilike("name", pattern);
+    }
 
     competitionsQuery = competitionsQuery.ilike(
       "name",
@@ -396,8 +509,18 @@ async function SearchResults({ searchParams }: Props) {
     bandsQuery = bandsQuery.eq("kind", filters.kind);
   }
 
+  if (filters.city) {
+    const pattern = `%${escapeLike(filters.city)}%`;
+
+    bandsQuery = bandsQuery.ilike("city", pattern);
+    competitionsQuery = competitionsQuery.ilike(
+      "city",
+      pattern
+    );
+  }
+
   if (filters.state) {
-    const pattern = escapedSearch(filters.state);
+    const pattern = `%${escapeLike(filters.state)}%`;
 
     bandsQuery = bandsQuery.ilike("state", pattern);
     competitionsQuery = competitionsQuery.ilike(
@@ -413,332 +536,364 @@ async function SearchResults({ searchParams }: Props) {
     );
   }
 
-  if (filters.year) {
+  if (filters.type) {
     competitionsQuery = competitionsQuery.eq(
-      "season_year",
-      Number(filters.year)
+      "competition_type",
+      filters.type
     );
   }
 
-  const [bandsResult, competitionsResult] =
-    await Promise.all([
-      bandsQuery.range(
-        bandFrom,
-        bandFrom + PAGE_SIZE - 1
-      ),
+  if (filters.from) {
+    competitionsQuery = competitionsQuery.gte(
+      "season_year",
+      Number(filters.from)
+    );
+  }
 
-      competitionsQuery.range(
-        competitionFrom,
-        competitionFrom + PAGE_SIZE - 1
-      ),
-    ]);
+  if (filters.to) {
+    competitionsQuery = competitionsQuery.lte(
+      "season_year",
+      Number(filters.to)
+    );
+  }
 
-  const bandCount = bandsResult.count ?? 0;
+  const results = invalidRange
+    ? null
+    : await Promise.all([
+        bandsQuery.range(
+          bandFrom,
+          bandFrom + PAGE_SIZE - 1
+        ),
+        competitionsQuery.range(
+          competitionFrom,
+          competitionFrom + PAGE_SIZE - 1
+        ),
+      ]);
+
+  const bandsResult = results?.[0];
+  const competitionsResult = results?.[1];
+
+  const bands = bandsResult?.data ?? [];
+  const competitions = competitionsResult?.data ?? [];
+
+  const bandCount = bandsResult?.count ?? 0;
   const competitionCount =
-    competitionsResult.count ?? 0;
+    competitionsResult?.count ?? 0;
 
   const supabaseUrl =
     process.env.NEXT_PUBLIC_SUPABASE_URL ?? "";
 
-  const isFiltered =
-    Boolean(filters.q) ||
-    Boolean(filters.kind) ||
-    Boolean(filters.state) ||
-    Boolean(filters.organization) ||
-    Boolean(filters.year);
-
   return (
     <div className="mx-auto max-w-7xl space-y-10 px-6 py-10">
-      <SearchFilters filters={filters} />
+      <SearchForm filters={filters} />
 
-      <section className="space-y-4">
-        <p className="text-xs font-bold uppercase tracking-widest text-[#861F41]">
-          {isFiltered
-            ? "Your Search Results"
-            : "Explore Our Records"}
-        </p>
-
-        <h2 className="font-serif text-3xl font-bold text-[#002144]">
-          {isFiltered
-            ? "Results Across the Archive"
-            : "Discover the Marching Arts"}
-        </h2>
-
-        <p className="max-w-3xl text-sm leading-7 text-slate-600">
-          {isFiltered
-            ? "Results matching your selected search and filters."
-            : "Browse the available ensemble profiles and published historical competitions. Use the search and filters above to narrow your results."}
-        </p>
-      </section>
-
-      <div className="grid gap-4 sm:grid-cols-2">
-        <a
-          href="#ensembles"
-          className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm transition hover:border-[#861F41]"
+      {invalidRange && (
+        <div
+          role="alert"
+          className="rounded-xl border border-amber-200 bg-amber-50 p-5 text-sm text-amber-900"
         >
-          <p className="text-xs font-bold uppercase tracking-widest text-[#861F41]">
-            Ensembles
-          </p>
+          The starting season cannot be later than the
+          ending season. Adjust your year range and
+          search again.
+        </div>
+      )}
 
-          <p className="mt-2 text-4xl font-bold tabular-nums text-[#002144]">
-            {bandsResult.error
-              ? "—"
-              : bandCount.toLocaleString("en-US")}
-          </p>
-
-          <p className="mt-2 text-sm text-slate-600">
-            Matching bands and drum corps
-          </p>
-        </a>
-
-        <a
-          href="#competitions"
-          className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm transition hover:border-[#861F41]"
+      {historicalSearchUnavailable && (
+        <div
+          role="status"
+          className="rounded-xl border border-amber-200 bg-amber-50 p-5 text-sm text-amber-900"
         >
-          <p className="text-xs font-bold uppercase tracking-widest text-[#861F41]">
-            Published Competitions
-          </p>
+          Historical-name matching is temporarily
+          unavailable. Current ensemble names and
+          competition names can still be searched.
+        </div>
+      )}
 
-          <p className="mt-2 text-4xl font-bold tabular-nums text-[#002144]">
-            {competitionsResult.error
-              ? "—"
-              : competitionCount.toLocaleString("en-US")}
-          </p>
+      {historicalResultsLimited && (
+        <div
+          role="status"
+          className="rounded-xl border border-amber-200 bg-amber-50 p-5 text-sm text-amber-900"
+        >
+          This historical-name search matched more than
+          500 name records. Narrow your search to ensure
+          all matching ensembles can be found.
+        </div>
+      )}
 
-          <p className="mt-2 text-sm text-slate-600">
-            Matching historical competition records
-          </p>
-        </a>
-      </div>
+      {!invalidRange && (
+        <>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <a
+              href="#ensembles"
+              className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm hover:border-[#861F41]"
+            >
+              <p className="text-xs font-bold uppercase tracking-widest text-[#861F41]">
+                Matching Ensembles
+              </p>
 
-      <section
-        id="ensembles"
-        className="scroll-mt-8 space-y-6"
-      >
-        <div className="flex flex-wrap items-end justify-between gap-3">
-          <div>
-            <p className="text-xs font-bold uppercase tracking-widest text-[#861F41]">
-              Ensemble Directory
-            </p>
+              <p className="mt-2 text-4xl font-bold tabular-nums text-[#002144]">
+                {bandsResult?.error
+                  ? "—"
+                  : bandCount.toLocaleString("en-US")}
+              </p>
 
-            <h2 className="mt-2 font-serif text-3xl font-bold text-[#002144]">
-              Bands &amp; Drum Corps
-            </h2>
+              <p className="mt-2 text-sm text-slate-600">
+                Current and historical name matches
+              </p>
+            </a>
+
+            <a
+              href="#competitions"
+              className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm hover:border-[#861F41]"
+            >
+              <p className="text-xs font-bold uppercase tracking-widest text-[#861F41]">
+                Matching Competitions
+              </p>
+
+              <p className="mt-2 text-4xl font-bold tabular-nums text-[#002144]">
+                {competitionsResult?.error
+                  ? "—"
+                  : competitionCount.toLocaleString("en-US")}
+              </p>
+
+              <p className="mt-2 text-sm text-slate-600">
+                Published historical events
+              </p>
+            </a>
           </div>
 
-          <Link
-            href="/bands"
-            className="text-sm font-bold text-[#861F41] hover:underline"
+          <section
+            id="ensembles"
+            className="scroll-mt-8 space-y-6"
           >
-            Browse All Ensembles &rarr;
-          </Link>
-        </div>
+            <div className="flex flex-wrap items-end justify-between gap-3">
+              <div>
+                <p className="text-xs font-bold uppercase tracking-widest text-[#861F41]">
+                  Ensemble Records
+                </p>
 
-        {bandsResult.error ? (
-          <p
-            role="alert"
-            className="rounded-xl border border-red-200 bg-red-50 p-6 text-sm text-red-900"
-          >
-            Ensemble search is temporarily unavailable.
-          </p>
-        ) : bandsResult.data?.length ? (
-          <>
-            <div className="grid gap-4 md:grid-cols-2">
-              {bandsResult.data.map((band) => (
-                <article
-                  key={band.id}
-                  className="flex items-start gap-4 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm transition hover:border-[#861F41] hover:shadow-md"
-                >
-                  <BandLogo
-                    name={band.name}
-                    bandId={band.id}
-                    logoPath={band.logo_path}
-                    supabaseUrl={supabaseUrl}
-                    size="medium"
-                  />
+                <h2 className="mt-2 font-serif text-3xl font-bold text-[#002144]">
+                  Bands &amp; Drum Corps
+                </h2>
+              </div>
 
-                  <div className="min-w-0 flex-1">
-                    <p className="text-xs font-bold uppercase tracking-wide text-[#861F41]">
-                      {formatKind(band.kind)}
-                    </p>
-
-                    <h3 className="mt-2 text-lg font-bold text-[#002144]">
-                      <Link
-                        href={`/bands/${band.slug}`}
-                        className="hover:text-[#861F41] hover:underline"
-                      >
-                        {band.name}
-                      </Link>
-                    </h3>
-
-                    <p className="mt-2 text-sm text-slate-600">
-                      {[
-                        band.city,
-                        band.state,
-                        band.country,
-                      ]
-                        .filter(Boolean)
-                        .join(", ") ||
-                        "Location not recorded"}
-                    </p>
-
-                    <Link
-                      href={`/bands/${band.slug}`}
-                      className="mt-4 inline-block text-sm font-bold text-[#861F41] hover:underline"
-                    >
-                      View Ensemble Profile &rarr;
-                    </Link>
-                  </div>
-                </article>
-              ))}
+              <Link
+                href="/bands"
+                className="text-sm font-bold text-[#861F41] hover:underline"
+              >
+                View Band Directory &rarr;
+              </Link>
             </div>
 
-            <Pagination
-              page={filters.bp}
-              total={bandCount}
-              target="bands"
-              filters={filters}
-            />
-          </>
-        ) : (
-          <div className="rounded-2xl border border-slate-200 bg-white px-6 py-10 text-center shadow-sm">
-            <h3 className="text-lg font-bold text-[#002144]">
-              No matching ensembles
-            </h3>
+            {bandsResult?.error ? (
+              <p
+                role="alert"
+                className="rounded-xl border border-red-200 bg-red-50 p-6 text-red-900"
+              >
+                Unable to load ensemble search results.
+              </p>
+            ) : bands.length === 0 ? (
+              <div className="rounded-2xl border border-slate-200 bg-white p-10 text-center">
+                <h3 className="font-bold text-[#002144]">
+                  No matching ensembles
+                </h3>
+                <p className="mt-2 text-sm text-slate-600">
+                  Try a different name, city, or ensemble type.
+                </p>
+              </div>
+            ) : (
+              <>
+                <div className="grid gap-4 md:grid-cols-2">
+                  {bands.map((band) => (
+                    <article
+                      key={band.id}
+                      className="flex items-start gap-4 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm hover:border-[#861F41]"
+                    >
+                      <BandLogo
+                        name={band.name}
+                        bandId={band.id}
+                        logoPath={band.logo_path}
+                        supabaseUrl={supabaseUrl}
+                        size="medium"
+                      />
 
-            <p className="mt-2 text-sm text-slate-600">
-              Try another name, type, or location.
-            </p>
-          </div>
-        )}
-      </section>
+                      <div className="min-w-0 flex-1">
+                        <p className="text-xs font-bold uppercase tracking-wider text-[#861F41]">
+                          {kindLabel(band.kind)}
+                        </p>
 
-      <section
-        id="competitions"
-        className="scroll-mt-8 space-y-6 border-t border-slate-200 pt-10"
-      >
-        <div className="flex flex-wrap items-end justify-between gap-3">
-          <div>
-            <p className="text-xs font-bold uppercase tracking-widest text-[#861F41]">
-              Competition History
-            </p>
+                        <h3 className="mt-2 text-lg font-bold text-[#002144]">
+                          <Link
+                            href={`/bands/${band.slug}`}
+                            className="hover:text-[#861F41] hover:underline"
+                          >
+                            {band.name}
+                          </Link>
+                        </h3>
 
-            <h2 className="mt-2 font-serif text-3xl font-bold text-[#002144]">
-              Historical Competitions
-            </h2>
-          </div>
+                        <p className="mt-2 text-sm text-slate-600">
+                          {[
+                            band.city,
+                            band.state,
+                            band.country,
+                          ]
+                            .filter(Boolean)
+                            .join(", ") ||
+                            "Location not recorded"}
+                        </p>
 
-          <Link
-            href="/competitions"
-            className="text-sm font-bold text-[#861F41] hover:underline"
+                        <Link
+                          href={`/bands/${band.slug}`}
+                          className="mt-4 inline-block text-sm font-bold text-[#861F41] hover:underline"
+                        >
+                          View Ensemble Profile &rarr;
+                        </Link>
+                      </div>
+                    </article>
+                  ))}
+                </div>
+
+                <Pagination
+                  page={filters.bp}
+                  count={bandCount}
+                  section="bands"
+                  filters={filters}
+                />
+              </>
+            )}
+          </section>
+
+          <section
+            id="competitions"
+            className="scroll-mt-8 space-y-6 border-t border-slate-200 pt-10"
           >
-            Browse All Competitions &rarr;
-          </Link>
-        </div>
+            <div className="flex flex-wrap items-end justify-between gap-3">
+              <div>
+                <p className="text-xs font-bold uppercase tracking-widest text-[#861F41]">
+                  Competition Records
+                </p>
 
-        {competitionsResult.error ? (
-          <p
-            role="alert"
-            className="rounded-xl border border-red-200 bg-red-50 p-6 text-sm text-red-900"
-          >
-            Competition search is temporarily unavailable.
-          </p>
-        ) : competitionsResult.data?.length ? (
-          <>
-            <div className="grid gap-4 md:grid-cols-2">
-              {competitionsResult.data.map(
-                (competition) => (
-                  <article
-                    key={competition.id}
-                    className="flex items-start gap-4 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm transition hover:border-[#861F41] hover:shadow-md"
-                  >
-                    <OrganizationMark
-                      code={competition.organization_code}
-                      size="medium"
-                    />
+                <h2 className="mt-2 font-serif text-3xl font-bold text-[#002144]">
+                  Historical Competitions
+                </h2>
+              </div>
 
-                    <div className="min-w-0 flex-1">
-                      <p className="text-xs font-bold uppercase tracking-wide text-[#861F41]">
-                        {competition.organization_code}
-                        {" · "}
-                        {competition.season_year}
-                      </p>
+              <Link
+                href="/competitions"
+                className="text-sm font-bold text-[#861F41] hover:underline"
+              >
+                Browse All Competitions &rarr;
+              </Link>
+            </div>
 
-                      <h3 className="mt-2 text-lg font-bold text-[#002144]">
+            {competitionsResult?.error ? (
+              <p
+                role="alert"
+                className="rounded-xl border border-red-200 bg-red-50 p-6 text-red-900"
+              >
+                Unable to load competition search results.
+              </p>
+            ) : competitions.length === 0 ? (
+              <div className="rounded-2xl border border-slate-200 bg-white p-10 text-center">
+                <h3 className="font-bold text-[#002144]">
+                  No matching published competitions
+                </h3>
+                <p className="mt-2 text-sm text-slate-600">
+                  Try changing the season range,
+                  organization, competition type, or location.
+                </p>
+              </div>
+            ) : (
+              <>
+                <div className="grid gap-4 md:grid-cols-2">
+                  {competitions.map((competition) => (
+                    <article
+                      key={competition.id}
+                      className="flex items-start gap-4 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm hover:border-[#861F41]"
+                    >
+                      <OrganizationMark
+                        code={competition.organization_code}
+                        size="medium"
+                      />
+
+                      <div className="min-w-0 flex-1">
+                        <p className="text-xs font-bold uppercase tracking-wider text-[#861F41]">
+                          {competition.organization_code}
+                          {" · "}
+                          {competition.season_year}
+                        </p>
+
+                        <h3 className="mt-2 text-lg font-bold text-[#002144]">
+                          <Link
+                            href={competitionPublicUrl(
+                              competition.slug
+                            )}
+                            className="hover:text-[#861F41] hover:underline"
+                          >
+                            {competition.name}
+                          </Link>
+                        </h3>
+
+                        <p className="mt-2 text-sm font-medium text-slate-600">
+                          {competitionTypeLabel(
+                            competition.competition_type
+                          )}
+                        </p>
+
+                        <p className="mt-2 text-sm text-slate-600">
+                          {dateLabel(
+                            competition.competition_date
+                          )}
+                        </p>
+
+                        <p className="mt-1 text-sm text-slate-600">
+                          {[
+                            competition.city,
+                            competition.state,
+                            competition.country,
+                          ]
+                            .filter(Boolean)
+                            .join(", ") ||
+                            "Location not recorded"}
+                        </p>
+
                         <Link
                           href={competitionPublicUrl(
                             competition.slug
                           )}
-                          className="hover:text-[#861F41] hover:underline"
+                          className="mt-4 inline-block text-sm font-bold text-[#861F41] hover:underline"
                         >
-                          {competition.name}
+                          View Competition &amp; Results &rarr;
                         </Link>
-                      </h3>
+                      </div>
+                    </article>
+                  ))}
+                </div>
 
-                      <p className="mt-2 text-sm text-slate-600">
-                        {readableDate(
-                          competition.competition_date
-                        )}
-                      </p>
+                <Pagination
+                  page={filters.cp}
+                  count={competitionCount}
+                  section="competitions"
+                  filters={filters}
+                />
+              </>
+            )}
+          </section>
+        </>
+      )}
 
-                      <p className="mt-1 text-sm text-slate-600">
-                        {[
-                          competition.city,
-                          competition.state,
-                          competition.country,
-                        ]
-                          .filter(Boolean)
-                          .join(", ") ||
-                          "Location not recorded"}
-                      </p>
-
-                      <Link
-                        href={competitionPublicUrl(
-                          competition.slug
-                        )}
-                        className="mt-4 inline-block text-sm font-bold text-[#861F41] hover:underline"
-                      >
-                        View Competition &amp; Results &rarr;
-                      </Link>
-                    </div>
-                  </article>
-                )
-              )}
-            </div>
-
-            <Pagination
-              page={filters.cp}
-              total={competitionCount}
-              target="competitions"
-              filters={filters}
-            />
-          </>
-        ) : (
-          <div className="rounded-2xl border border-slate-200 bg-white px-6 py-10 text-center shadow-sm">
-            <h3 className="text-lg font-bold text-[#002144]">
-              No matching published competitions
-            </h3>
-
-            <p className="mt-2 text-sm text-slate-600">
-              Try another competition name,
-              organization, season, or location.
-            </p>
-          </div>
-        )}
-      </section>
-
-      <section className="rounded-2xl border border-slate-200 bg-white p-6 text-sm leading-7 text-slate-600">
+      <section className="rounded-2xl border border-slate-200 bg-white p-6">
         <h2 className="font-bold text-[#002144]">
-          About Archive Search
+          About Historical Search
         </h2>
 
-        <p className="mt-2">
+        <p className="mt-2 text-sm leading-7 text-slate-600">
           This search includes non-archived ensemble
           profiles and published, non-archived
-          competitions. Draft competitions are not
-          included in public results. As additional
-          historical records are verified and published,
-          they become available here automatically.
+          competitions. Historical names are searched
+          when recorded in the band-name archive.
+          Draft competitions and archived records
+          are excluded from public results.
         </p>
       </section>
     </div>
@@ -755,13 +910,13 @@ export default function SearchPage(props: Props) {
           </p>
 
           <h1 className="mt-4 font-serif text-4xl font-bold md:text-5xl">
-            Explore the Archive
+            Advanced Archive Search
           </h1>
 
           <p className="mt-5 max-w-2xl text-lg leading-8 text-slate-300">
-            Discover the history of marching music.
-            Search ensembles and published competitions
-            across organizations and seasons.
+            Search ensembles by current or former names,
+            explore published competitions, and narrow
+            your research by place, organization, or era.
           </p>
         </div>
       </section>
@@ -773,12 +928,12 @@ export default function SearchPage(props: Props) {
               role="status"
               className="rounded-2xl border border-slate-200 bg-white p-8 text-sm text-slate-600"
             >
-              Searching The Marching Archives...
+              Searching historical records...
             </div>
           </div>
         }
       >
-        <SearchResults searchParams={props.searchParams} />
+        <SearchContent searchParams={props.searchParams} />
       </Suspense>
     </main>
   );
