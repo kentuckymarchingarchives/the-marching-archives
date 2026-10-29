@@ -1,4 +1,3 @@
-  import { formatTotalScore, formatCaptionScore } from "@/lib/score-format";
 
 import { Suspense } from "react";
 import Link from "next/link";
@@ -13,6 +12,7 @@ import {
 } from "@/lib/public-competition-routes";
 
 import BandLogo from "@/components/BandLogo";
+import RecordCitation from "@/components/RecordCitation";
 
 export const instant = false;
 
@@ -52,6 +52,21 @@ type CaptionScore = {
   caption_id: string;
   score: number;
 };
+
+function scoreText(
+  value: number | string | null | undefined
+): string {
+  if (value === null || value === undefined) return "—";
+
+  const valueNumber = Number(value);
+
+  if (!Number.isFinite(valueNumber)) return "—";
+
+  return valueNumber
+    .toFixed(4)
+    .replace(/0+$/, "")
+    .replace(/\.$/, "");
+}
 
 function rankText(value: number | null, tied: boolean): string {
   if (value === null) return "—";
@@ -211,7 +226,7 @@ function ResultsTable({
                 </td>
 
                 <td className="px-5 py-4 text-right font-bold tabular-nums text-[#002144]">
-                  {formatTotalScore(entry.total_score)}
+                  {scoreText(entry.total_score)}
                 </td>
               </tr>
             );
@@ -507,6 +522,14 @@ async function RoundContent({ params }: Props) {
         <a href="#details" className="rounded-xl border border-slate-200 bg-slate-50 px-5 py-3 text-sm font-bold text-[#002144] transition hover:bg-slate-100">
           Caption Breakdowns
         </a>
+        {!incomplete && (
+          <a
+            href={`${canonical}/export`}
+            className="rounded-xl border border-[#861F41]/30 bg-white px-5 py-3 text-sm font-bold text-[#861F41] hover:bg-rose-50"
+          >
+            Download CSV
+          </a>
+        )}
         <a href="#sources" className="rounded-xl border border-slate-200 bg-white px-5 py-3 text-sm font-bold text-slate-600 transition hover:bg-slate-50">
           Sources
         </a>
@@ -607,7 +630,7 @@ async function RoundContent({ params }: Props) {
                     <p className="mt-1 text-sm text-slate-600">
                       {entry.classification ?? "Unclassified"}
                       {" · "}
-                      Total: {formatTotalScore(entry.total_score)}
+                      Total: {scoreText(entry.total_score)}
                     </p>
                   </div>
 
@@ -654,7 +677,7 @@ async function RoundContent({ params }: Props) {
                         Total Score
                       </p>
                       <p className="mt-1 font-bold tabular-nums text-[#002144]">
-                        {formatTotalScore(entry.total_score)}
+                        {scoreText(entry.total_score)}
                       </p>
                     </div>
                   </div>
@@ -681,14 +704,14 @@ async function RoundContent({ params }: Props) {
                                 {caption.name}
                               </td>
                               <td className="px-4 py-3 text-right tabular-nums">
-                                {formatCaptionScore(
+                                {scoreText(
                                   scores.get(
                                     `${entry.id}:${caption.id}`
                                   )
                                 )}
                               </td>
                               <td className="px-4 py-3 text-right tabular-nums text-slate-500">
-                                {formatCaptionScore(caption.max_score)}
+                                {scoreText(caption.max_score)}
                               </td>
                             </tr>
                           ))}
@@ -721,6 +744,13 @@ async function RoundContent({ params }: Props) {
           })
         )}
       </section>
+
+      <RecordCitation
+        competition={competition.name}
+        season={competition.season_year}
+        round={round.name}
+        path={canonical}
+      />
 
       <section id="sources" className="scroll-mt-28 rounded-2xl border border-slate-200 bg-white p-7">
         <h2 className="text-2xl font-bold text-[#002144]">
