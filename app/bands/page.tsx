@@ -2,6 +2,7 @@ import { Suspense } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import BandStatusBadge from "@/components/BandStatusBadge";
+import EnsembleLogo from "@/components/EnsembleLogo";
 
 const PAGE_SIZE = 24;
 
@@ -52,21 +53,6 @@ function directoryUrl(
   return suffix ? `/bands?${suffix}` : "/bands";
 }
 
-function BandLogo({ name, url }: { name: string; url: string | null }) {
-  return (
-    <div className="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-slate-200 bg-slate-50 p-2 sm:h-20 sm:w-20">
-      {url ? (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img src={url} alt={`${name} logo`} loading="lazy" className="h-full w-full object-contain" />
-      ) : (
-        <svg viewBox="0 0 48 48" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true" className="h-9 w-9 text-slate-300">
-          <path d="M8 12h32v25H8zM14 19h20M14 25h20M14 31h14" strokeLinecap="round" strokeLinejoin="round" />
-        </svg>
-      )}
-    </div>
-  );
-}
-
 function BandCard({ band, logoUrl }: { band: Band; logoUrl: string | null }) {
   const location = [band.city, band.state, band.country]
     .filter((part, index, parts) => Boolean(part) && (index === 0 || part !== parts[index - 1]))
@@ -76,7 +62,7 @@ function BandCard({ band, logoUrl }: { band: Band; logoUrl: string | null }) {
   return (
     <Link href={`/bands/${band.slug}`} className="group flex flex-col rounded-2xl border border-slate-200 bg-white p-5 shadow-sm transition-all hover:-translate-y-0.5 hover:border-[#861F41]/50 hover:shadow-md focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#861F41]">
       <div className="flex min-w-0 items-start gap-4">
-        <BandLogo name={band.name} url={logoUrl} />
+        <EnsembleLogo name={band.name} src={logoUrl} size="medium" />
         <div className="min-w-0 flex-1">
           <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-[#861F41]">{category}</p>
           <h3 className="mt-1 text-lg font-extrabold leading-snug text-[#002144] transition-colors group-hover:text-[#861F41]">{band.name}</h3>

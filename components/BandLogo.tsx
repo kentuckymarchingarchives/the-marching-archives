@@ -1,3 +1,4 @@
+import EnsembleLogo from "@/components/EnsembleLogo";
 
 type Props = {
   name: string;
@@ -37,31 +38,11 @@ export default function BandLogo({
       : null;
 
   return (
-    <span
-      className={`inline-flex shrink-0 items-center justify-center overflow-hidden rounded-lg border border-slate-200 bg-white p-1.5 ${sizes[size]} ${className}`}
-    >
-      {imageUrl ? (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img
-          src={imageUrl}
-          alt={`${name} logo`}
-          loading="lazy"
-          className="h-full w-full object-contain"
-        />
-      ) : (
-        <svg
-          viewBox="0 0 48 48"
-          aria-hidden="true"
-          className="h-1/2 w-1/2 text-slate-300"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="2"
-        >
-          <rect x="5" y="7" width="38" height="34" rx="5" />
-          <circle cx="17" cy="18" r="4" />
-          <path d="m9 35 11-11 7 7 5-5 7 9" />
-        </svg>
-      )}
-    </span>
+    <EnsembleLogo
+      name={name}
+      src={imageUrl}
+      size={size}
+      className={className}
+    />
   );
 }
