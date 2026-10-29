@@ -10,6 +10,7 @@ const links = [
   { href: "/bands", label: "Bands & Corps" },
   { href: "/competitions", label: "Competitions" },
   { href: "/organizations", label: "Organizations" },
+  { href: "/leaderboards", label: "Leaderboards" },
 ];
 
 export default function SiteHeader() {
