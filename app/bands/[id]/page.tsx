@@ -135,71 +135,51 @@ async function BandProfileContent({ params }: Props) {
 
   return (
     <>
-      <section className="bg-[#002144] px-6 py-14 text-white md:py-20">
-        <div className="mx-auto max-w-5xl">
-          <Link
-            href="/bands"
-            className="text-sm font-semibold text-[#E1BBC7] hover:text-white hover:underline"
-          >
-            &larr; All Bands &amp; Drum Corps
-          </Link>
-
-          <div className="mt-9 flex flex-wrap items-center gap-6 md:gap-8">
-            <div className="flex h-28 w-28 shrink-0 items-center justify-center overflow-hidden rounded-2xl border border-white/20 bg-white p-3 shadow-lg md:h-36 md:w-36">
+      <section className="bg-[#002144] text-white">
+        <div className="mx-auto max-w-6xl px-5 pb-12 pt-8 sm:px-8 md:pb-16">
+          <nav aria-label="Breadcrumb" className="flex flex-wrap items-center gap-2 text-sm text-slate-300">
+            <Link href="/" className="hover:text-white">Home</Link>
+            <span aria-hidden="true">/</span>
+            <Link href="/bands" className="hover:text-white">Bands &amp; Corps</Link>
+            <span aria-hidden="true">/</span>
+            <span className="font-semibold text-white" aria-current="page">{band.name}</span>
+          </nav>
+          <div className="mt-9 flex flex-col gap-6 sm:flex-row sm:items-center sm:gap-8">
+            <div className="flex h-28 w-28 shrink-0 items-center justify-center overflow-hidden rounded-2xl border border-white/15 bg-white p-3 shadow-xl sm:h-36 sm:w-36">
               {logoUrl ? (
                 // eslint-disable-next-line @next/next/no-img-element
-                <img
-                  src={logoUrl}
-                  alt={`${band.name} logo`}
-                  className="h-full w-full object-contain"
-                />
+                <img src={logoUrl} alt={`${band.name} logo`} className="h-full w-full object-contain" />
               ) : (
-                <svg
-                  viewBox="0 0 48 48"
-                  aria-hidden="true"
-                  className="h-14 w-14 text-slate-300"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                >
-                  <rect
-                    x="5"
-                    y="7"
-                    width="38"
-                    height="34"
-                    rx="5"
-                  />
-                  <circle cx="17" cy="18" r="4" />
-                  <path d="m9 35 11-11 7 7 5-5 7 9" />
-                </svg>
+                <span aria-hidden="true" className="text-5xl font-black text-[#002144]">{band.name.slice(0, 1)}</span>
               )}
             </div>
-
             <div className="min-w-0 flex-1">
-              <p className="text-xs font-bold uppercase tracking-[0.2em] text-[#E1BBC7]">
-                {ensembleType(band.kind)}
-              </p>
-
-              <h1 className="mt-3 font-serif text-4xl font-bold leading-tight md:text-5xl">
-                {band.name}
-              </h1>
-
-              <p className="mt-4 text-base text-slate-300">
-                {location || "Location not recorded"}
-              </p>
+              <p className="text-xs font-bold uppercase tracking-[0.2em] text-[#efb8ca]">{ensembleType(band.kind)}</p>
+              <h1 className="mt-2 text-3xl font-extrabold tracking-tight sm:text-4xl md:text-5xl">{band.name}</h1>
+              <p className="mt-3 text-sm text-slate-200 sm:text-base">{location || "Location not recorded"}</p>
+              <div className="mt-5 inline-flex rounded-full bg-white px-3 py-1.5 text-[#002144]">
+                <BandStatusBadge status={band.competitive_status} />
+              </div>
             </div>
           </div>
+          <nav aria-label="Band profile sections" className="mt-9 flex flex-wrap gap-2 border-t border-white/15 pt-6">
+            <a href="#overview" className="rounded-lg bg-white px-4 py-2 text-sm font-bold text-[#002144]">Overview</a>
+            <a href="#history" className="rounded-lg border border-white/25 px-4 py-2 text-sm font-semibold text-white hover:bg-white/10">Competition history</a>
+            <a href="#names" className="rounded-lg border border-white/25 px-4 py-2 text-sm font-semibold text-white hover:bg-white/10">Historical names</a>
+            <Link href={`/bands/${band.slug}/achievements`} className="rounded-lg border border-white/25 px-4 py-2 text-sm font-semibold text-white hover:bg-white/10">Achievements ↗</Link>
+            <Link href={`/bands/${band.slug}/statistics`} className="rounded-lg border border-white/25 px-4 py-2 text-sm font-semibold text-white hover:bg-white/10">Statistics ↗</Link>
+          </nav>
         </div>
       </section>
 
-      <div className="bg-[#F4F6F9]">
-        <div className="mx-auto max-w-5xl space-y-8 px-6 py-12">
-          <section className="rounded-2xl border border-slate-200 bg-white p-7 shadow-sm">
+      <div id="overview" className="bg-[#F4F6F9]">
+        <div className="mx-auto max-w-6xl space-y-7 px-5 py-10 sm:px-8">
+          <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm sm:p-8">
             <p className="text-xs font-bold uppercase tracking-widest text-[#861F41]">
               Ensemble Information
             </p>
 
-            <h2 className="mt-3 font-serif text-2xl font-bold text-[#002144]">
+            <h2 className="mt-3 text-2xl font-extrabold tracking-tight text-[#002144]">
               About {band.name}
             </h2>
 
@@ -243,12 +223,12 @@ async function BandProfileContent({ params }: Props) {
             />
           </Suspense>
 
-          <section className="rounded-2xl border border-slate-200 bg-white p-7 shadow-sm">
+          <section id="names" className="scroll-mt-28 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm sm:p-8">
             <p className="text-xs font-bold uppercase tracking-widest text-[#861F41]">
               Ensemble History
             </p>
 
-            <h2 className="mt-3 font-serif text-2xl font-bold text-[#002144]">
+            <h2 className="mt-3 text-2xl font-extrabold tracking-tight text-[#002144]">
               Historical Names
             </h2>
 
@@ -281,12 +261,12 @@ async function BandProfileContent({ params }: Props) {
           </section>
 
           {band.notes && (
-            <section className="rounded-2xl border border-slate-200 bg-white p-7 shadow-sm">
+            <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm sm:p-8">
               <p className="text-xs font-bold uppercase tracking-widest text-[#861F41]">
                 Historical Documentation
               </p>
 
-              <h2 className="mt-3 font-serif text-2xl font-bold text-[#002144]">
+              <h2 className="mt-3 text-2xl font-extrabold tracking-tight text-[#002144]">
                 Additional Information
               </h2>
 
@@ -300,6 +280,7 @@ async function BandProfileContent({ params }: Props) {
 
       {/* History is rendered ONLY on the main profile,
           not automatically on statistics or achievements. */}
+      <div id="history" className="scroll-mt-28">
       <Suspense
         fallback={
           <section className="bg-[#F4F6F9] px-6 py-12">
@@ -313,6 +294,7 @@ async function BandProfileContent({ params }: Props) {
           bandIdentifier={band.slug}
         />
       </Suspense>
+      </div>
     </>
   );
 }
