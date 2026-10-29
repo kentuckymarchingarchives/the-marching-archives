@@ -1,7 +1,13 @@
 
 "use client";
 
-import { useActionState, useEffect, useMemo, useState } from "react";
+import {
+  useActionState,
+  useEffect,
+  useMemo,
+  useState,
+} from "react";
+import type { ClipboardEvent } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 
@@ -45,6 +51,9 @@ const initialState: SpreadsheetSaveState = {
   savedCount: 0,
 };
 
+const inputClass =
+  "w-full min-w-20 rounded-md border border-slate-300 bg-white px-2 py-2 text-sm text-[#002144] focus:border-[#861F41] focus:outline-none focus:ring-2 focus:ring-[#861F41]/20 disabled:bg-slate-100";
+
 function validNumber(value: string): number | null {
   if (value.trim() === "") return null;
 
@@ -64,13 +73,25 @@ function calculatedTotal(
   let total = 0;
 
   for (const caption of captions) {
-    const value = validNumber(
+    const score = validNumber(
       row.captions[caption.id] ?? ""
     );
 
-    if (value === null) return null;
+    if (
+      score === null ||
+      score > caption.max_score
+    ) {
+      return null;
+    }
 
-    total += value * caption.multiplier;
+    total += score * caption.multiplier;
+  }
+
+  if (
+    !Number.isFinite(total) ||
+    total > 999999
+  ) {
+    return null;
   }
 
   return Number(total.toFixed(4));
@@ -86,70 +107,85 @@ function officialTotal(
 }
 
 function scoreText(value: number | null): string {
-  return value === null
-    ? "—"
-    : value.toFixed(4).replace(/0+$/, "").replace(/\.$/, "");
+  if (value === null) return "—";
+
+  return value
+    .toFixed(4)
+    .replace(/0+$/, "")
+    .replace(/\.$/, "");
 }
+
+type RankedRecord = {
+  id: string;
+  classification: string | null;
+  score: number;
+};
 
 function computeRankings(
   rows: SpreadsheetRow[],
   captions: SpreadsheetCaption[]
 ) {
-  const scored = rows
-    .map((row) => ({
-      id: row.entryId,
-      classification: row.classification,
-      score: officialTotal(row, captions),
-    }))
-    .filter(
-      (
-        value
-      ): value is {
-        id: string;
-        classification: string | null;
-        score: number;
-      } => value.score !== null
-    );
+  const scored: RankedRecord[] = [];
+
+  for (const row of rows) {
+    const score = officialTotal(row, captions);
+
+    if (score !== null) {
+      scored.push({
+        id: row.entryId,
+        classification: row.classification,
+        score,
+      });
+    }
+  }
 
   const overall = new Map<string, number>();
   const byClass = new Map<string, number>();
 
   function assign(
-    records: typeof scored,
+    records: RankedRecord[],
     destination: Map<string, number>
   ) {
     const sorted = [...records].sort(
       (a, b) =>
-        b.score - a.score || a.id.localeCompare(b.id)
+        b.score - a.score ||
+        a.id.localeCompare(b.id)
     );
 
     let previousScore: number | null = null;
     let currentRank = 0;
 
     sorted.forEach((record, index) => {
+      // Results are recorded to a maximum of
+      // four decimal places in this editor.
+      const score = Math.round(
+        record.score * 10000
+      );
+
       if (
         previousScore === null ||
-        Math.abs(record.score - previousScore) > 0.00001
+        score !== previousScore
       ) {
         currentRank = index + 1;
       }
 
       destination.set(record.id, currentRank);
-      previousScore = record.score;
+      previousScore = score;
     });
   }
 
   assign(scored, overall);
 
-  const groups = new Map<string, typeof scored>();
+  const groups = new Map<string, RankedRecord[]>();
 
   for (const record of scored) {
     if (!record.classification) continue;
 
-    groups.set(record.classification, [
-      ...(groups.get(record.classification) ?? []),
-      record,
-    ]);
+    const group =
+      groups.get(record.classification) ?? [];
+
+    group.push(record);
+    groups.set(record.classification, group);
   }
 
   for (const group of groups.values()) {
@@ -157,6 +193,43 @@ function computeRankings(
   }
 
   return { overall, byClass };
+}
+
+function parsePastedGrid(text: string): string[][] {
+  const normalized = text.replace(/\r\n?/g, "\n");
+
+  // Spreadsheet applications typically append
+  // one final newline to copied ranges.
+  const withoutFinalNewline =
+    normalized.endsWith("\n")
+      ? normalized.slice(0, -1)
+      : normalized;
+
+  return withoutFinalNewline
+    .split("\n")
+    .map((line) => line.split("\t"));
+}
+
+function validateCaptionValue(
+  value: string,
+  caption: SpreadsheetCaption
+): string | null {
+  if (value === "") return null;
+
+  if (!/^\d+(?:\.\d{1,4})?$/.test(value)) {
+    return `${caption.name} must be a nonnegative number with up to four decimal places.`;
+  }
+
+  const number = Number(value);
+
+  if (
+    !Number.isFinite(number) ||
+    number > caption.max_score
+  ) {
+    return `${caption.name} cannot exceed ${caption.max_score}.`;
+  }
+
+  return null;
 }
 
 export default function LiveResultsSpreadsheet({
@@ -178,6 +251,11 @@ export default function LiveResultsSpreadsheet({
     initialState
   );
 
+  const [notice, setNotice] = useState("");
+  const [pasteError, setPasteError] = useState("");
+  const [confirmRankFill, setConfirmRankFill] =
+    useState(false);
+
   useEffect(() => {
     setRows(initialRows);
   }, [initialRows]);
@@ -190,12 +268,11 @@ export default function LiveResultsSpreadsheet({
 
   const dirty = useMemo(
     () =>
-      rows.filter((row, index) => {
-        return (
+      rows.filter(
+        (row, index) =>
           JSON.stringify(row) !==
           JSON.stringify(initialRows[index])
-        );
-      }),
+      ),
     [rows, initialRows]
   );
 
@@ -207,6 +284,8 @@ export default function LiveResultsSpreadsheet({
   const scoredCount = rows.filter(
     (row) => officialTotal(row, captions) !== null
   ).length;
+
+  const canEdit = editable && !incomplete && !pending;
 
   function updateRow(
     entryId: string,
@@ -241,8 +320,211 @@ export default function LiveResultsSpreadsheet({
     );
   }
 
-  const inputClass =
-    "w-full min-w-20 rounded-md border border-slate-300 bg-white px-2 py-2 text-sm text-[#002144] focus:border-[#861F41] focus:outline-none focus:ring-2 focus:ring-[#861F41]/20 disabled:bg-slate-100";
+  function pasteCaptions(
+    event: ClipboardEvent<HTMLInputElement>,
+    startRow: number,
+    startColumn: number
+  ) {
+    if (!canEdit) return;
+
+    const raw = event.clipboardData.getData("text");
+
+    // Leave ordinary single-cell paste to the browser.
+    if (!raw.includes("\t") && !raw.includes("\n")) {
+      return;
+    }
+
+    event.preventDefault();
+
+    setPasteError("");
+    setNotice("");
+
+    const grid = parsePastedGrid(raw);
+
+    if (
+      !grid.length ||
+      grid.some((line) => line.length === 0)
+    ) {
+      setPasteError("The pasted range is empty.");
+      return;
+    }
+
+    if (
+      startRow + grid.length > rows.length
+    ) {
+      setPasteError(
+        "The pasted range extends beyond the final band row. No changes were made."
+      );
+      return;
+    }
+
+    if (
+      grid.some(
+        (line) =>
+          startColumn + line.length >
+          captions.length
+      )
+    ) {
+      setPasteError(
+        "The pasted range extends beyond the final caption column. No changes were made."
+      );
+      return;
+    }
+
+    for (let r = 0; r < grid.length; r++) {
+      for (let c = 0; c < grid[r].length; c++) {
+        const caption = captions[startColumn + c];
+        const value = grid[r][c].trim();
+
+        const error = validateCaptionValue(
+          value,
+          caption
+        );
+
+        if (error) {
+          setPasteError(
+            `Pasted row ${r + 1}, column ${
+              c + 1
+            }: ${error} No changes were made.`
+          );
+          return;
+        }
+      }
+    }
+
+    // Validation finished. Apply the range together.
+    setRows((previous) => {
+      const updated = previous.map((row) => ({
+        ...row,
+        captions: { ...row.captions },
+      }));
+
+      for (let r = 0; r < grid.length; r++) {
+        for (let c = 0; c < grid[r].length; c++) {
+          const caption = captions[startColumn + c];
+
+          updated[startRow + r].captions[
+            caption.id
+          ] = grid[r][c].trim();
+        }
+      }
+
+      return updated;
+    });
+
+    const cells = grid.reduce(
+      (total, line) => total + line.length,
+      0
+    );
+
+    setNotice(
+      `Pasted ${cells} caption ${
+        cells === 1 ? "cell" : "cells"
+      } across ${grid.length} ${
+        grid.length === 1 ? "band" : "bands"
+      }. Review the values before saving.`
+    );
+  }
+
+  function fillPlacements() {
+    if (!canEdit || !confirmRankFill) return;
+
+    const current = computeRankings(rows, captions);
+
+    setRows((previous) =>
+      previous.map((row) => {
+        const overall = current.overall.get(
+          row.entryId
+        );
+
+        const classRank = current.byClass.get(
+          row.entryId
+        );
+
+        // Unscored entries remain unchanged.
+        if (overall === undefined) {
+          return row;
+        }
+
+        return {
+          ...row,
+          overallPlacement: String(overall),
+          classPlacement:
+            classRank !== undefined
+              ? String(classRank)
+              : row.classPlacement,
+        };
+      })
+    );
+
+    setConfirmRankFill(false);
+    setPasteError("");
+    setNotice(
+      "Score-based placements have been filled into the editable cells. They are not saved yet. Verify them against the official historical results."
+    );
+  }
+
+  function discardChanges() {
+    setRows(initialRows);
+    setNotice("Unsaved changes discarded.");
+    setPasteError("");
+    setConfirmRankFill(false);
+  }
+
+  function saveValidationError(): string | null {
+    for (const row of dirty) {
+      for (const caption of captions) {
+        const error = validateCaptionValue(
+          row.captions[caption.id] ?? "",
+          caption
+        );
+
+        if (error) {
+          return `${row.bandName}: ${error}`;
+        }
+      }
+
+      if (
+        row.totalMode === "automatic" &&
+        captions.length > 0 &&
+        captions.every(
+          (caption) =>
+            (row.captions[caption.id] ?? "") !== ""
+        ) &&
+        calculatedTotal(row, captions) === null
+      ) {
+        return `${row.bandName}: calculated total is invalid.`;
+      }
+
+      if (
+        row.totalMode === "manual" &&
+        row.manualTotal !== "" &&
+        (!/^\d+(?:\.\d{1,4})?$/.test(
+          row.manualTotal
+        ) ||
+          Number(row.manualTotal) > 999999)
+      ) {
+        return `${row.bandName}: invalid manual total.`;
+      }
+    }
+
+    return null;
+  }
+
+  function handleSubmit(
+    event: React.FormEvent<HTMLFormElement>
+  ) {
+    const error = saveValidationError();
+
+    if (error) {
+      event.preventDefault();
+      setPasteError(error);
+      return;
+    }
+
+    setNotice("");
+    setPasteError("");
+  }
 
   return (
     <section className="space-y-6">
@@ -265,7 +547,7 @@ export default function LiveResultsSpreadsheet({
         <div className="flex flex-wrap gap-3">
           <Link
             href={`/staff/competitions/${competitionId}/rounds/${roundId}#captions`}
-            className="rounded-lg border border-slate-300 bg-white px-5 py-3 text-sm font-bold text-[#002144] hover:bg-slate-50"
+            className="rounded-lg border border-slate-300 px-5 py-3 text-sm font-bold text-[#002144] hover:bg-slate-50"
           >
             Manage Custom Captions
           </Link>
@@ -281,8 +563,8 @@ export default function LiveResultsSpreadsheet({
 
       {!editable && (
         <div className="rounded-xl border border-amber-200 bg-amber-50 p-5 text-sm text-amber-900">
-          Results are read-only because this competition
-          is published or archived.
+          This competition is read-only.
+          Only active draft results can be edited.
         </div>
       )}
 
@@ -291,45 +573,116 @@ export default function LiveResultsSpreadsheet({
           role="alert"
           className="rounded-xl border border-red-200 bg-red-50 p-5 text-sm text-red-900"
         >
-          This round has more than 500 entries.
-          The spreadsheet is displaying only part of
-          the lineup. Saving is disabled until
-          pagination support is added.
+          More than 500 entries exist in this round.
+          Editing is disabled until full pagination
+          support is added.
         </div>
       )}
 
       {!captions.length && (
         <div className="rounded-xl border border-amber-200 bg-amber-50 p-5 text-sm text-amber-900">
-          No custom captions are configured.
-          Add your scoring captions before using
-          automatic total calculation. You can
-          still enter official totals manually.
+          No scoring captions are configured.
+          You may enter official totals manually,
+          or add custom captions through Caption Management.
         </div>
       )}
 
-      <div className="rounded-2xl border border-slate-200 bg-white p-5">
-        <h2 className="font-bold text-[#002144]">
-          How the Live Calculator Works
+      <section className="rounded-2xl border border-slate-200 bg-white p-6">
+        <h2 className="text-lg font-bold text-[#002144]">
+          Bulk Paste from a Spreadsheet
         </h2>
 
         <p className="mt-3 text-sm leading-7 text-slate-600">
-          Automatic totals are calculated from all
-          configured captions and multipliers. If
-          any caption is blank, the calculated total
-          remains blank. Switch a band's Total Mode
-          to Manual to enter the official result
-          independently of the caption calculation.
+          In Excel or Google Sheets, copy a rectangle
+          containing caption scores only. In TMA,
+          click the corresponding starting caption
+          cell and paste with Ctrl + V.
+          Values fill across caption columns and
+          downward through the displayed band rows.
         </p>
 
         <p className="mt-2 text-sm leading-7 text-slate-600">
-          Live ranks are previews based on official
-          or calculated totals. They do not overwrite
-          historical placements. Enter the official
-          class and overall placements separately.
+          Make sure the band order matches the copied
+          spreadsheet. Pasting does not match bands by
+          name. Blank cells clear caption scores.
+          Invalid values or ranges are rejected entirely.
         </p>
-      </div>
+      </section>
 
-      <form action={action} className="space-y-5">
+      <section className="rounded-2xl border border-slate-200 bg-white p-6">
+        <h2 className="text-lg font-bold text-[#002144]">
+          Score-Based Placement Tools
+        </h2>
+
+        <p className="mt-3 text-sm leading-7 text-slate-600">
+          Calculate placements using the current
+          official or automatically calculated totals.
+          Tied scores receive the same placement,
+          and the next placement skips occupied ranks.
+          Overall and class rankings are calculated
+          independently.
+        </p>
+
+        <p className="mt-3 text-sm font-semibold text-[#861F41]">
+          These rankings are only suitable when the
+          historical competition ranked bands directly
+          by these totals. Penalties, adjudication
+          decisions, and historical exceptions may
+          require manually entered placements.
+        </p>
+
+        <label className="mt-5 flex items-start gap-3 text-sm text-slate-700">
+          <input
+            type="checkbox"
+            checked={confirmRankFill}
+            onChange={(event) =>
+              setConfirmRankFill(event.target.checked)
+            }
+            disabled={!canEdit || rows.length === 0}
+            className="mt-1"
+          />
+
+          <span>
+            I understand this replaces the currently
+            entered placement cells for scored bands
+            in the spreadsheet. I will verify all
+            placements before saving.
+          </span>
+        </label>
+
+        <button
+          type="button"
+          onClick={fillPlacements}
+          disabled={!canEdit || !confirmRankFill}
+          className="mt-5 rounded-lg bg-[#002144] px-6 py-3 text-sm font-bold text-white hover:bg-[#123B63] disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          Fill Placements from Scores
+        </button>
+      </section>
+
+      {pasteError && (
+        <div
+          role="alert"
+          className="rounded-xl border border-red-200 bg-red-50 p-5 text-sm font-semibold text-red-900"
+        >
+          {pasteError}
+        </div>
+      )}
+
+      {notice && (
+        <div
+          role="status"
+          className="rounded-xl border border-blue-200 bg-blue-50 p-5 text-sm font-medium text-blue-900"
+        >
+          {notice}
+        </div>
+      )}
+
+      <form
+        action={action}
+        onSubmit={handleSubmit}
+        className="space-y-5"
+      >
         <input
           type="hidden"
           name="competition_id"
@@ -345,17 +698,17 @@ export default function LiveResultsSpreadsheet({
         <input
           type="hidden"
           name="payload"
-          value={JSON.stringify(dirty)}
           readOnly
+          value={JSON.stringify(dirty)}
         />
 
         <div className="overflow-x-auto rounded-2xl border border-slate-200 bg-white shadow-sm">
-          <table className="min-w-max w-full border-collapse text-left text-sm">
-            <thead className="sticky top-0 z-10 bg-[#002144] text-white">
+          <table className="w-full min-w-max border-collapse text-left text-sm">
+            <thead className="bg-[#002144] text-white">
               <tr>
                 <th
                   scope="col"
-                  className="sticky left-0 z-20 min-w-52 border-r border-white/15 bg-[#002144] px-4 py-4"
+                  className="sticky left-0 z-10 min-w-52 border-r border-white/15 bg-[#002144] px-4 py-4"
                 >
                   Ensemble
                 </th>
@@ -366,8 +719,8 @@ export default function LiveResultsSpreadsheet({
 
                 {captions.map((caption) => (
                   <th
-                    scope="col"
                     key={caption.id}
+                    scope="col"
                     className="min-w-32 px-3 py-4"
                   >
                     <span className="block">
@@ -376,8 +729,7 @@ export default function LiveResultsSpreadsheet({
 
                     <span className="mt-1 block text-xs font-normal text-slate-300">
                       Max {caption.max_score}
-                      {" · "}
-                      ×{caption.multiplier}
+                      {" · "}×{caption.multiplier}
                     </span>
                   </th>
                 ))}
@@ -413,7 +765,7 @@ export default function LiveResultsSpreadsheet({
             </thead>
 
             <tbody className="divide-y divide-slate-200">
-              {rows.map((row, index) => {
+              {rows.map((row, rowIndex) => {
                 const calculated = calculatedTotal(
                   row,
                   captions
@@ -426,7 +778,7 @@ export default function LiveResultsSpreadsheet({
 
                 const modified =
                   JSON.stringify(row) !==
-                  JSON.stringify(initialRows[index]);
+                  JSON.stringify(initialRows[rowIndex]);
 
                 return (
                   <tr
@@ -458,7 +810,7 @@ export default function LiveResultsSpreadsheet({
                       <select
                         aria-label={`${row.bandName} classification`}
                         value={row.classification ?? ""}
-                        disabled={!editable || pending}
+                        disabled={!canEdit}
                         onChange={(event) =>
                           updateRow(row.entryId, {
                             classification:
@@ -468,6 +820,7 @@ export default function LiveResultsSpreadsheet({
                         className={inputClass}
                       >
                         <option value="">None</option>
+
                         {classes.map((classification) => (
                           <option
                             key={classification}
@@ -479,7 +832,7 @@ export default function LiveResultsSpreadsheet({
                       </select>
                     </td>
 
-                    {captions.map((caption) => (
+                    {captions.map((caption, columnIndex) => (
                       <td
                         key={caption.id}
                         className="px-3 py-3"
@@ -493,12 +846,19 @@ export default function LiveResultsSpreadsheet({
                           value={
                             row.captions[caption.id] ?? ""
                           }
-                          disabled={!editable || pending}
+                          disabled={!canEdit}
                           onChange={(event) =>
                             updateCaption(
                               row.entryId,
                               caption.id,
                               event.target.value
+                            )
+                          }
+                          onPaste={(event) =>
+                            pasteCaptions(
+                              event,
+                              rowIndex,
+                              columnIndex
                             )
                           }
                           className={inputClass}
@@ -514,7 +874,7 @@ export default function LiveResultsSpreadsheet({
                       <select
                         aria-label={`${row.bandName} total mode`}
                         value={row.totalMode}
-                        disabled={!editable || pending}
+                        disabled={!canEdit}
                         onChange={(event) =>
                           updateRow(row.entryId, {
                             totalMode:
@@ -543,7 +903,7 @@ export default function LiveResultsSpreadsheet({
                           max="999999"
                           step="0.0001"
                           value={row.manualTotal}
-                          disabled={!editable || pending}
+                          disabled={!canEdit}
                           onChange={(event) =>
                             updateRow(row.entryId, {
                               manualTotal:
@@ -580,7 +940,7 @@ export default function LiveResultsSpreadsheet({
                         min="1"
                         step="1"
                         value={row.classPlacement}
-                        disabled={!editable || pending}
+                        disabled={!canEdit}
                         onChange={(event) =>
                           updateRow(row.entryId, {
                             classPlacement:
@@ -598,7 +958,7 @@ export default function LiveResultsSpreadsheet({
                         min="1"
                         step="1"
                         value={row.overallPlacement}
-                        disabled={!editable || pending}
+                        disabled={!canEdit}
                         onChange={(event) =>
                           updateRow(row.entryId, {
                             overallPlacement:
@@ -615,7 +975,7 @@ export default function LiveResultsSpreadsheet({
                         type="text"
                         maxLength={5000}
                         value={row.notes}
-                        disabled={!editable || pending}
+                        disabled={!canEdit}
                         onChange={(event) =>
                           updateRow(row.entryId, {
                             notes: event.target.value,
@@ -634,15 +994,19 @@ export default function LiveResultsSpreadsheet({
           {rows.length === 0 && (
             <div className="p-10 text-center text-sm text-slate-600">
               No bands are entered in this round.
-              Add bands using the individual results
-              editor before entering scores here.
+              Use the Individual Results Editor
+              to add ensembles before entering scores.
             </div>
           )}
         </div>
 
         {state.status !== "idle" && (
           <div
-            role={state.status === "error" ? "alert" : "status"}
+            role={
+              state.status === "error"
+                ? "alert"
+                : "status"
+            }
             className={`rounded-xl border p-5 text-sm font-semibold ${
               state.status === "error"
                 ? "border-red-200 bg-red-50 text-red-900"
@@ -654,27 +1018,31 @@ export default function LiveResultsSpreadsheet({
         )}
 
         <div className="flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-slate-200 bg-white p-5">
-          <p className="text-sm text-slate-600">
-            Changes aren't saved until you select
-            Save All Changes.
-          </p>
+          <div>
+            <p className="font-semibold text-[#002144]">
+              {dirty.length} modified{" "}
+              {dirty.length === 1 ? "row" : "rows"}
+            </p>
+
+            <p className="mt-1 text-xs text-slate-600">
+              No database changes occur until you save.
+            </p>
+          </div>
 
           <div className="flex flex-wrap gap-3">
             <button
               type="button"
-              disabled={pending || dirty.length === 0}
-              onClick={() => setRows(initialRows)}
+              onClick={discardChanges}
+              disabled={!canEdit || dirty.length === 0}
               className="rounded-lg border border-slate-300 px-5 py-3 text-sm font-bold text-[#002144] disabled:opacity-50"
             >
-              Discard Unsaved Changes
+              Discard Changes
             </button>
 
             <button
               type="submit"
               disabled={
-                !editable ||
-                incomplete ||
-                pending ||
+                !canEdit ||
                 dirty.length === 0
               }
               className="rounded-lg bg-[#861F41] px-7 py-3 text-sm font-bold text-white hover:bg-[#701832] disabled:cursor-not-allowed disabled:opacity-50"
@@ -688,11 +1056,12 @@ export default function LiveResultsSpreadsheet({
       </form>
 
       <p className="text-xs leading-6 text-slate-500">
-        Saving uses the existing database result function.
-        Each changed entry is committed separately.
-        If a later entry fails, previously saved entries
-        may remain saved. Reload before retrying
-        any partially completed save.
+        Each modified band is saved through the
+        existing protected database function.
+        Saving multiple bands is not yet a single
+        all-or-nothing transaction. If a save fails
+        partway through, reload the page to reconcile
+        saved and unsaved records.
       </p>
     </section>
   );
