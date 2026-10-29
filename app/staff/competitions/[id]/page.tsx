@@ -1,240 +1,535 @@
 
 import { Suspense } from "react";
 import Link from "next/link";
-import { redirect } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 
 import { createClient } from "@/lib/supabase/server";
+import { UUID_PATTERN } from "@/lib/band-validation";
 import { readableLabel } from "@/lib/competition-config";
+import { competitionPublicUrl } from "@/lib/public-competition-routes";
 
 export const instant = false;
 
 type Props = {
-  searchParams: Promise<{
-    year?: string;
-    organization?: string;
-  }>;
+  params: Promise<{ id: string }>;
 };
 
-async function CompetitionList({ searchParams }: Props) {
-  const filters = await searchParams;
-  const year = (filters.year ?? "").trim();
-  const organization =
-    (filters.organization ?? "").trim();
+type Competition = {
+  id: string;
+  name: string;
+  slug: string | null;
+  season_year: number;
+  organization_code: string;
+  competition_type: string;
+  competition_date: string | null;
+  city: string | null;
+  state: string | null;
+  country: string | null;
+  source_url: string | null;
+  publication_status: string;
+  archived_at: string | null;
+};
+
+type CompetitionRound = {
+  id: string;
+  name: string;
+  round_kind: string;
+  class_scope: string | null;
+  sort_order: number;
+  archived_at: string | null;
+};
+
+function formatDate(value: string | null): string {
+  if (!value) return "Date not recorded";
+
+  const date = new Date(`${value}T12:00:00Z`);
+
+  if (Number.isNaN(date.getTime())) {
+    return "Date not recorded";
+  }
+
+  return date.toLocaleDateString("en-US", {
+    dateStyle: "long",
+    timeZone: "UTC",
+  });
+}
+
+function InfoCard({
+  label,
+  value,
+}: {
+  label: string;
+  value: string | number;
+}) {
+  return (
+    <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+      <p className="text-xs font-bold uppercase tracking-wider text-slate-500">
+        {label}
+      </p>
+
+      <p className="mt-3 text-lg font-bold text-[#002144]">
+        {value}
+      </p>
+    </div>
+  );
+}
+
+async function CompetitionManagement({
+  params,
+}: Props) {
+  const { id } = await params;
+
+  if (!UUID_PATTERN.test(id)) {
+    notFound();
+  }
 
   const supabase = await createClient();
 
-  const { data: auth } = await supabase.auth.getClaims();
+  // Require an authenticated staff account.
+  const { data: auth, error: authError } =
+    await supabase.auth.getClaims();
 
-  if (!auth?.claims?.sub) {
+  if (authError || !auth?.claims?.sub) {
     redirect("/staff/login");
   }
 
-  const { data: staff } = await supabase
-    .from("staff_members")
-    .select("role, status")
-    .eq("user_id", auth.claims.sub)
-    .maybeSingle();
+  const { data: staff, error: staffError } =
+    await supabase
+      .from("staff_members")
+      .select("role, status")
+      .eq("user_id", auth.claims.sub)
+      .maybeSingle();
 
   if (
+    staffError ||
     staff?.status !== "active" ||
     !["owner", "admin", "editor"].includes(staff.role)
   ) {
     redirect("/staff/login?error=unauthorized");
   }
 
-  let query = supabase
-    .from("competitions")
-    .select(
-      "id, name, season_year, organization_code, competition_type, competition_date, city, state, publication_status"
-    )
-    .is("archived_at", null)
-    .order("season_year", { ascending: false })
-    .order("name", { ascending: true })
-    .limit(100);
+  // Load the selected competition, not the directory.
+  const { data: competitionData, error: competitionError } =
+    await supabase
+      .from("competitions")
+      .select(
+        "id, name, slug, season_year, organization_code, competition_type, competition_date, city, state, country, source_url, publication_status, archived_at"
+      )
+      .eq("id", id)
+      .maybeSingle();
 
-  if (/^\d{4}$/.test(year)) {
-    query = query.eq("season_year", Number(year));
+  if (competitionError) {
+    throw new Error(
+      "Unable to load competition management details."
+    );
   }
 
-  if (["KMEA", "MSBA", "BOA", "DCI"].includes(organization)) {
-    query = query.eq("organization_code", organization);
+  if (!competitionData) {
+    notFound();
   }
 
-  const { data: competitions, error } = await query;
+  const competition = competitionData as Competition;
 
-  const canManageArchive =
-    staff.role === "owner" || staff.role === "admin";
+  // Retrieve the rounds belonging to this competition.
+  const { data: roundData, error: roundError } =
+    await supabase
+      .from("competition_rounds")
+      .select(
+        "id, name, round_kind, class_scope, sort_order, archived_at"
+      )
+      .eq("competition_id", id)
+      .order("sort_order", { ascending: true })
+      .limit(100);
+
+  if (roundError) {
+    throw new Error(
+      "Unable to load competition rounds."
+    );
+  }
+
+  const rounds = (roundData ?? []) as CompetitionRound[];
+
+  const activeRounds = rounds.filter(
+    (round) => !round.archived_at
+  );
+
+  const published =
+    competition.publication_status === "published";
+
+  const archived = Boolean(competition.archived_at);
+
+  const canPublish =
+    staff.role === "owner" ||
+    staff.role === "admin";
+
+  const location = [
+    competition.city,
+    competition.state,
+    competition.country,
+  ]
+    .filter(Boolean)
+    .join(", ");
+
+  let sourceUrl: string | null = null;
+
+  if (competition.source_url) {
+    try {
+      const parsed = new URL(competition.source_url);
+
+      if (
+        parsed.protocol === "https:" ||
+        parsed.protocol === "http:"
+      ) {
+        sourceUrl = parsed.toString();
+      }
+    } catch {
+      sourceUrl = null;
+    }
+  }
 
   return (
-    <div className="mx-auto max-w-6xl space-y-7 px-6 py-10">
-      <Link
-        href="/staff/dashboard"
-        className="text-sm font-semibold text-[#861F41]"
-      >
-        ← Staff Dashboard
-      </Link>
+    <main className="min-h-screen bg-[#F4F6F9]">
+      <section className="bg-[#002144] px-6 py-12 text-white">
+        <div className="mx-auto max-w-6xl">
+          <Link
+            href="/staff/competitions"
+            className="text-sm font-semibold text-[#E0B4C2] hover:text-white hover:underline"
+          >
+            &larr; All Competitions
+          </Link>
 
-      <div className="flex flex-wrap items-center justify-between gap-4">
-        <div>
-          <p className="text-xs font-bold uppercase tracking-widest text-[#861F41]">
-            Archive Management
+          <p className="mt-8 text-xs font-bold uppercase tracking-widest text-[#E0B4C2]">
+            Competition Management
           </p>
 
-          <h1 className="mt-2 font-serif text-4xl font-bold text-[#002144]">
-            Competitions
+          <h1 className="mt-3 font-serif text-3xl font-bold md:text-4xl">
+            {competition.name}
           </h1>
 
-          <p className="mt-3 text-sm text-slate-600">
-            Manage active competition records.
-            Archived events are kept separately.
+          <p className="mt-4 text-sm text-slate-300">
+            {competition.organization_code}
+            {" · "}
+            {competition.season_year}
+            {" · "}
+            {readableLabel(
+              competition.competition_type
+            )}
           </p>
-        </div>
 
-        <div className="flex flex-wrap gap-3">
-          {canManageArchive && (
+          <div className="mt-5 flex flex-wrap gap-3">
+            <span
+              className={`rounded-full px-4 py-2 text-xs font-bold ${
+                published
+                  ? "bg-emerald-100 text-emerald-900"
+                  : "bg-amber-100 text-amber-900"
+              }`}
+            >
+              {published ? "Published" : "Draft"}
+            </span>
+
+            {archived && (
+              <span className="rounded-full bg-red-100 px-4 py-2 text-xs font-bold text-red-900">
+                Archived
+              </span>
+            )}
+          </div>
+        </div>
+      </section>
+
+      <div className="mx-auto max-w-6xl space-y-10 px-6 py-10">
+        {archived && (
+          <div
+            role="alert"
+            className="rounded-xl border border-amber-200 bg-amber-50 p-5 text-sm leading-7 text-amber-900"
+          >
+            This competition is archived.
+            Restore it through the Archive Center
+            before editing or publishing its results.
+          </div>
+        )}
+
+        {published && !archived && (
+          <div className="rounded-xl border border-blue-200 bg-blue-50 p-5 text-sm leading-7 text-blue-900">
+            This competition is currently published.
+            You can review its results, but changes
+            require returning it to Draft first.
+          </div>
+        )}
+
+        <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <InfoCard
+            label="Organization"
+            value={competition.organization_code}
+          />
+
+          <InfoCard
+            label="Season"
+            value={competition.season_year}
+          />
+
+          <InfoCard
+            label="Active Rounds"
+            value={activeRounds.length}
+          />
+
+          <InfoCard
+            label="Publication"
+            value={published ? "Published" : "Draft"}
+          />
+        </section>
+
+        <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm md:p-8">
+          <p className="text-xs font-bold uppercase tracking-widest text-[#861F41]">
+            Event Details
+          </p>
+
+          <h2 className="mt-2 font-serif text-2xl font-bold text-[#002144]">
+            Competition Information
+          </h2>
+
+          <div className="mt-6 grid gap-6 sm:grid-cols-2">
+            <div>
+              <p className="text-xs font-bold uppercase tracking-wider text-slate-500">
+                Date
+              </p>
+              <p className="mt-2 font-semibold text-[#002144]">
+                {formatDate(
+                  competition.competition_date
+                )}
+              </p>
+            </div>
+
+            <div>
+              <p className="text-xs font-bold uppercase tracking-wider text-slate-500">
+                Location
+              </p>
+              <p className="mt-2 font-semibold text-[#002144]">
+                {location || "Location not recorded"}
+              </p>
+            </div>
+
+            <div>
+              <p className="text-xs font-bold uppercase tracking-wider text-slate-500">
+                Competition Type
+              </p>
+              <p className="mt-2 font-semibold text-[#002144]">
+                {readableLabel(
+                  competition.competition_type
+                )}
+              </p>
+            </div>
+
+            <div>
+              <p className="text-xs font-bold uppercase tracking-wider text-slate-500">
+                Recorded Source
+              </p>
+
+              {sourceUrl ? (
+                <a
+                  href={sourceUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="mt-2 inline-block font-semibold text-[#861F41] hover:underline"
+                >
+                  Open Historical Source &rarr;
+                </a>
+              ) : (
+                <p className="mt-2 font-semibold text-slate-500">
+                  No source link recorded
+                </p>
+              )}
+            </div>
+          </div>
+        </section>
+
+        <section
+          id="competition-rounds"
+          className="scroll-mt-8 space-y-5"
+        >
+          <div>
+            <p className="text-xs font-bold uppercase tracking-widest text-[#861F41]">
+              Results Administration
+            </p>
+
+            <h2 className="mt-2 font-serif text-3xl font-bold text-[#002144]">
+              Competition Rounds
+            </h2>
+
+            <p className="mt-3 max-w-3xl text-sm leading-7 text-slate-600">
+              Select a round to manage participating bands,
+              enter total scores, edit caption results,
+              and record class and overall placements.
+            </p>
+          </div>
+
+          {activeRounds.length ? (
+            <div className="space-y-4">
+              {activeRounds.map((round) => (
+                <article
+                  key={round.id}
+                  className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm"
+                >
+                  <div className="flex flex-wrap items-center justify-between gap-5">
+                    <div className="min-w-0">
+                      <p className="text-xs font-bold uppercase tracking-wider text-[#861F41]">
+                        {readableLabel(
+                          round.round_kind
+                        )}
+                      </p>
+
+                      <h3 className="mt-2 text-xl font-bold text-[#002144]">
+                        {round.name}
+                      </h3>
+
+                      <p className="mt-2 text-sm text-slate-600">
+                        {round.class_scope
+                          ? `Classification: ${round.class_scope}`
+                          : "All eligible classifications"}
+                      </p>
+                    </div>
+
+                    <div className="flex flex-wrap gap-3">
+                      <Link
+                        href={`/staff/competitions/${id}/rounds/${round.id}`}
+                        className="inline-flex items-center justify-center rounded-lg bg-[#861F41] px-5 py-3 text-sm font-bold text-white transition hover:bg-[#701832]"
+                      >
+                        {published
+                          ? "View Results"
+                          : "Manage Results"}
+                        <span
+                          aria-hidden="true"
+                          className="ml-2"
+                        >
+                          &rarr;
+                        </span>
+                      </Link>
+
+                      {!archived && (
+                        <Link
+                          href={`/staff/competitions/${id}/rounds/${round.id}/tools`}
+                          className="inline-flex items-center justify-center rounded-lg border border-slate-300 bg-white px-5 py-3 text-sm font-bold text-[#002144] transition hover:bg-slate-50"
+                        >
+                          Round Tools
+                        </Link>
+                      )}
+                    </div>
+                  </div>
+                </article>
+              ))}
+            </div>
+          ) : (
+            <div className="rounded-2xl border border-slate-200 bg-white p-8 text-center shadow-sm">
+              <h3 className="text-xl font-bold text-[#002144]">
+                No Active Rounds
+              </h3>
+
+              <p className="mt-3 text-sm leading-7 text-slate-600">
+                No active rounds are currently configured
+                for this competition. The competition
+                needs at least one round before bands
+                and results can be entered.
+              </p>
+            </div>
+          )}
+        </section>
+
+        <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm md:p-8">
+          <p className="text-xs font-bold uppercase tracking-widest text-[#861F41]">
+            Historical Verification
+          </p>
+
+          <h2 className="mt-2 font-serif text-2xl font-bold text-[#002144]">
+            Review &amp; Publishing
+          </h2>
+
+          <p className="mt-3 max-w-3xl text-sm leading-7 text-slate-600">
+            Check scores and placements, resolve review
+            issues, verify historical sources, and
+            manage public publication status.
+          </p>
+
+          <div className="mt-6 flex flex-wrap gap-3">
+            <Link
+              href={`/staff/competitions/${id}/review`}
+              className="rounded-lg border border-slate-300 bg-white px-5 py-3 text-sm font-bold text-[#002144] hover:bg-slate-50"
+            >
+              Full Review Report
+            </Link>
+
+            <Link
+              href={`/staff/competitions/${id}/publish`}
+              className="rounded-lg bg-[#002144] px-5 py-3 text-sm font-bold text-white hover:bg-[#123B63]"
+            >
+              Review &amp; Publish &rarr;
+            </Link>
+
+            {published && competition.slug && (
+              <Link
+                href={competitionPublicUrl(
+                  competition.slug
+                )}
+                className="rounded-lg bg-emerald-700 px-5 py-3 text-sm font-bold text-white hover:bg-emerald-800"
+              >
+                View Public Competition &rarr;
+              </Link>
+            )}
+          </div>
+
+          {!canPublish && (
+            <p className="mt-5 text-xs leading-6 text-slate-500">
+              Editors can enter and review results.
+              Only Owners and Administrators may
+              approve or publish competitions.
+            </p>
+          )}
+        </section>
+
+        <div className="flex flex-wrap gap-5 border-t border-slate-200 pt-6">
+          <Link
+            href="/staff/competitions"
+            className="text-sm font-bold text-[#861F41] hover:underline"
+          >
+            &larr; All Competitions
+          </Link>
+
+          <Link
+            href="/staff/dashboard"
+            className="text-sm font-bold text-[#002144] hover:underline"
+          >
+            Staff Dashboard
+          </Link>
+
+          {canPublish && (
             <Link
               href="/staff/archive"
-              className="rounded-lg border border-slate-300 bg-white px-5 py-3 text-sm font-bold text-[#002144]"
+              className="text-sm font-bold text-[#002144] hover:underline"
             >
               Archive Center
             </Link>
           )}
-
-          <Link
-            href="/staff/competitions/new"
-            className="rounded-lg bg-[#861F41] px-5 py-3 text-sm font-bold text-white"
-          >
-            + Add Competition
-          </Link>
         </div>
       </div>
-
-      <form
-        method="get"
-        className="grid gap-4 rounded-2xl border border-slate-200 bg-white p-5 sm:grid-cols-[1fr_1fr_auto]"
-      >
-        <label className="text-sm font-semibold text-[#002144]">
-          Season
-          <input
-            name="year"
-            type="number"
-            min={1800}
-            max={2200}
-            defaultValue={year}
-            placeholder="All years"
-            className="mt-2 w-full rounded-lg border border-slate-300 px-4 py-3"
-          />
-        </label>
-
-        <label className="text-sm font-semibold text-[#002144]">
-          Organization
-          <select
-            name="organization"
-            defaultValue={organization}
-            className="mt-2 w-full rounded-lg border border-slate-300 bg-white px-4 py-3"
-          >
-            <option value="">All organizations</option>
-            <option value="KMEA">KMEA</option>
-            <option value="MSBA">MSBA</option>
-            <option value="BOA">BOA</option>
-            <option value="DCI">DCI</option>
-          </select>
-        </label>
-
-        <button
-          type="submit"
-          className="self-end rounded-lg bg-[#002144] px-5 py-3 font-bold text-white"
-        >
-          Filter
-        </button>
-      </form>
-
-      {error ? (
-        <div role="alert" className="text-red-700">
-          Unable to load competitions: {error.message}
-        </div>
-      ) : competitions?.length ? (
-        <div className="space-y-3">
-          {competitions.map((competition) => (
-            <Link
-              key={competition.id}
-              href={`/staff/competitions/${competition.id}`}
-              className="block rounded-2xl border border-slate-200 bg-white p-6 transition hover:border-[#861F41]"
-            >
-              <div className="flex flex-wrap items-start justify-between gap-4">
-                <div>
-                  <p className="text-xs font-bold uppercase tracking-wider text-[#861F41]">
-                    {competition.organization_code} ·{" "}
-                    {competition.season_year}
-                  </p>
-
-                  <h2 className="mt-2 text-xl font-bold text-[#002144]">
-                    {competition.name}
-                  </h2>
-
-                  <p className="mt-2 text-sm text-slate-600">
-                    {readableLabel(competition.competition_type)}
-                  </p>
-
-                  <p className="mt-2 text-sm text-slate-500">
-                    {[
-                      competition.competition_date,
-                      competition.city,
-                      competition.state,
-                    ].filter(Boolean).join(" · ") ||
-                      "Date and location not set"}
-                  </p>
-                </div>
-
-                <span
-                  className={
-                    competition.publication_status === "published"
-                      ? "rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-bold text-emerald-800"
-                      : "rounded-full border border-amber-200 bg-amber-50 px-3 py-1 text-xs font-bold text-amber-800"
-                  }
-                >
-                  {competition.publication_status === "published"
-                    ? "Published"
-                    : "Draft"}
-                </span>
-              </div>
-            </Link>
-          ))}
-        </div>
-      ) : (
-        <div className="rounded-2xl border border-slate-200 bg-white p-10 text-center">
-          <h2 className="text-xl font-bold text-[#002144]">
-            No competitions found
-          </h2>
-
-          <p className="mt-3 text-sm text-slate-600">
-            Create a new event or adjust your filters.
-          </p>
-        </div>
-      )}
-
-      <p className="text-xs text-slate-500">
-        Showing up to 100 active competition records.
-      </p>
-    </div>
+    </main>
   );
 }
 
-export default function CompetitionsPage(props: Props) {
+export default function CompetitionManagementPage(
+  props: Props
+) {
   return (
-    <main className="min-h-screen bg-[#F4F6F9]">
-      <Suspense
-        fallback={
+    <Suspense
+      fallback={
+        <main className="min-h-screen bg-[#F4F6F9] px-6 py-12">
           <div
             role="status"
-            className="p-10 text-sm text-slate-600"
+            className="mx-auto max-w-6xl text-sm text-slate-600"
           >
-            Loading competitions...
+            Loading competition management...
           </div>
-        }
-      >
-        <CompetitionList {...props} />
-      </Suspense>
-    </main>
+        </main>
+      }
+    >
+      <CompetitionManagement params={props.params} />
+    </Suspense>
   );
 }
