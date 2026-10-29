@@ -113,11 +113,11 @@ async function CompetitionsIndex({ searchParams }: Props) {
 
       <div className="mx-auto max-w-6xl space-y-6 px-6 py-9">
         <form method="get" action="/staff/competitions" className="flex flex-wrap items-end gap-3 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-          <div className="min-w-[200px] flex-1">
+          <div className="min-w-50 flex-1">
             <label htmlFor="competition-search" className="mb-2 block text-sm font-semibold">Competition name</label>
             <input id="competition-search" type="search" name="q" defaultValue={q} placeholder="Search competitions..." className="w-full rounded-lg border border-slate-300 px-4 py-3 text-sm focus-visible:outline-2 focus-visible:outline-[#861F41]" />
           </div>
-          <div className="min-w-[160px]">
+          <div className="min-w-40">
             <label htmlFor="competition-status" className="mb-2 block text-sm font-semibold">Show</label>
             <select id="competition-status" name="status" defaultValue={status} className="w-full rounded-lg border border-slate-300 bg-white px-4 py-3 text-sm">
               <option value="all">All active</option>
