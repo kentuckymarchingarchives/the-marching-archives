@@ -323,7 +323,7 @@ async function AchievementsContent({ params }: Props) {
             <p className="mt-2 text-sm leading-6 text-slate-600">The twelve most recent published round results with a recorded first-place finish, in class or overall.</p>
           </div>
           <div className="overflow-x-auto rounded-2xl border border-slate-200 bg-white shadow-sm">
-            <table className="w-full min-w-[650px] text-left text-sm">
+            <table className="w-full min-w-162.5 text-left text-sm">
               <thead className="bg-slate-100 text-xs uppercase tracking-wide text-[#002144]">
                 <tr><th scope="col" className="px-5 py-4">Season</th><th scope="col" className="px-5 py-4">Competition / Round</th><th scope="col" className="px-5 py-4">Class</th><th scope="col" className="px-5 py-4">Class Place</th><th scope="col" className="px-5 py-4">Overall Place</th></tr>
               </thead>
@@ -354,7 +354,7 @@ async function AchievementsContent({ params }: Props) {
           </div>
           <div className="max-w-sm"><Metric title="Finals First Places" count={championshipFinalFirsts.length} explanation="Recorded first in class or overall in a championship final; official title not confirmed." /></div>
           <div className="overflow-x-auto rounded-2xl border border-slate-200 bg-white shadow-sm">
-            <table className="w-full min-w-[650px] text-left text-sm">
+            <table className="w-full min-w-162.5 text-left text-sm">
               <thead className="bg-slate-100 text-xs uppercase tracking-wide text-[#002144]">
                 <tr><th scope="col" className="px-5 py-4">Season</th><th scope="col" className="px-5 py-4">Competition / Round</th><th scope="col" className="px-5 py-4">Class</th><th scope="col" className="px-5 py-4">Class Place</th><th scope="col" className="px-5 py-4">Overall Place</th></tr>
               </thead>

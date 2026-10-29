@@ -153,26 +153,31 @@ async function StatisticsContent({ params }: Props) {
     notFound();
   }
 
-  const { data: rawEntries, count, error: entriesError } =
-    await supabase
+  // Page through all entries instead of silently cutting statistics off at 1,000.
+  // Cap at 10,000 to bound server work; display a clear notice if exceeded.
+  const entries: Entry[] = [];
+  const ENTRY_PAGE_SIZE = 500;
+  const ENTRY_LIMIT = 10000;
+  let totalEntryCount = 0;
+
+  for (let offset = 0; offset < ENTRY_LIMIT; offset += ENTRY_PAGE_SIZE) {
+    const { data, count, error } = await supabase
       .from("competition_entries")
       .select(
         "id, round_id, classification, total_score, class_placement, overall_placement",
-        { count: "exact" }
+        { count: offset === 0 ? "exact" : undefined }
       )
       .eq("band_id", band.id)
       .order("id", { ascending: true })
-      .limit(1000);
+      .range(offset, offset + ENTRY_PAGE_SIZE - 1);
 
-  if (entriesError) {
-    throw new Error(
-      "Unable to load ensemble performance records."
-    );
+    if (error) throw new Error("Unable to load ensemble performance records.");
+    if (offset === 0) totalEntryCount = count ?? 0;
+    entries.push(...((data ?? []) as Entry[]));
+    if (!data || data.length < ENTRY_PAGE_SIZE) break;
   }
 
-  const entries = (rawEntries ?? []) as Entry[];
-  const recordLimitReached =
-    (count ?? 0) > entries.length;
+  const recordLimitReached = totalEntryCount > entries.length;
 
   const rounds = await loadInChunks<Round>(
     entries.map((entry) => entry.round_id),
@@ -340,6 +345,24 @@ async function StatisticsContent({ params }: Props) {
     (a, b) => b[0] - a[0]
   );
 
+  const seasonScorePoints = seasonRows
+    .map(([year, season]) => ({
+      year,
+      count: season.scores.length,
+      average: season.scores.length
+        ? season.scores.reduce((sum, score) => sum + score, 0) / season.scores.length
+        : null,
+    }))
+    .filter((point): point is { year: number; count: number; average: number } =>
+      point.average !== null
+    )
+    .sort((a, b) => a.year - b.year);
+
+  const maxSeasonAverage = Math.max(
+    1,
+    ...seasonScorePoints.map((point) => point.average)
+  );
+
   const recentRecords = [...records]
     .sort((a, b) => {
       const yearDifference =
@@ -363,28 +386,27 @@ async function StatisticsContent({ params }: Props) {
   const canonicalId = band.slug || band.id;
 
   return (
-    <div className="mx-auto max-w-7xl space-y-10 px-6 py-10">
-      <Link
-        href={`/bands/${canonicalId}`}
-        className="text-sm font-bold text-[#861F41] hover:underline"
-      >
-        &larr; Back to Ensemble Profile
-      </Link>
+    <div className="mx-auto max-w-7xl space-y-9 px-5 py-8 md:px-8 md:py-12">
+      <nav aria-label="Breadcrumb" className="flex flex-wrap gap-2 text-sm text-slate-600">
+        <Link href="/bands" className="hover:text-[#861F41] hover:underline">Bands & Corps</Link>
+        <span aria-hidden="true">/</span>
+        <Link href={`/bands/${canonicalId}`} className="hover:text-[#861F41] hover:underline">{band.name}</Link>
+        <span aria-hidden="true">/</span>
+        <span aria-current="page" className="font-semibold text-[#002144]">Statistics</span>
+      </nav>
 
-      <header className="space-y-3">
-        <p className="text-xs font-bold uppercase tracking-widest text-[#861F41]">
-          Competitive Statistics
+      <header className="overflow-hidden rounded-3xl bg-[#002144] px-7 py-9 text-white md:px-10 md:py-12">
+        <p className="text-xs font-bold uppercase tracking-[0.2em] text-[#edb0c5]">Historical performance</p>
+        <h1 className="mt-3 text-3xl font-extrabold tracking-tight md:text-5xl">{band.name}</h1>
+        <p className="mt-3 max-w-2xl text-sm leading-7 text-slate-200 md:text-base">
+          Explore recorded placements, scores, and season-by-season results from published competitions.
         </p>
-
-        <h1 className="font-serif text-4xl font-bold text-[#002144]">
-          {band.name}
-        </h1>
-
-        <p className="max-w-3xl text-sm leading-7 text-slate-600">
-          Historical statistics calculated from
-          published competition results currently
-          recorded in The Marching Archives.
-        </p>
+        <nav aria-label="Statistics sections" className="mt-7 flex flex-wrap gap-2 text-sm font-semibold">
+          <a href="#overview" className="rounded-lg bg-white px-4 py-2 text-[#002144] hover:bg-slate-100">Overview</a>
+          <a href="#seasons" className="rounded-lg border border-white/25 px-4 py-2 text-white hover:bg-white/10">By season</a>
+          <a href="#results" className="rounded-lg border border-white/25 px-4 py-2 text-white hover:bg-white/10">Recent results</a>
+          <a href="#methodology" className="rounded-lg border border-white/25 px-4 py-2 text-white hover:bg-white/10">Methodology</a>
+        </nav>
       </header>
 
       {recordLimitReached && (
@@ -392,16 +414,12 @@ async function StatisticsContent({ params }: Props) {
           role="alert"
           className="rounded-xl border border-amber-200 bg-amber-50 p-5 text-sm text-amber-900"
         >
-          This ensemble has more than 1,000 recorded
-          round entries. Statistics below cover only
-          the first 1,000 loaded entries and are not
-          complete. Full pagination will be needed
-          before these totals can be considered final.
+          This ensemble has more than 10,000 round entries. Statistics below cover the first 10,000 loaded records and may be incomplete.
         </div>
       )}
 
-      <section className="space-y-5">
-        <h2 className="font-serif text-2xl font-bold text-[#002144]">
+      <section id="overview" className="scroll-mt-28 space-y-5">
+        <h2 className="text-2xl font-extrabold text-[#002144]">
           Career Overview
         </h2>
 
@@ -491,9 +509,9 @@ async function StatisticsContent({ params }: Props) {
         </div>
       </section>
 
-      <section className="space-y-5">
+      <section id="seasons" className="scroll-mt-28 space-y-5">
         <div>
-          <h2 className="font-serif text-2xl font-bold text-[#002144]">
+          <h2 className="text-2xl font-extrabold text-[#002144]">
             Season-by-Season History
           </h2>
 
@@ -503,8 +521,32 @@ async function StatisticsContent({ params }: Props) {
           </p>
         </div>
 
+        {seasonScorePoints.length > 0 && (
+          <div className="rounded-2xl border border-slate-200 bg-white p-5 md:p-7">
+            <h3 className="font-bold text-[#002144]">Average total score by season</h3>
+            <p className="mt-1 text-xs leading-5 text-slate-500">
+              Each bar represents the arithmetic mean of available round scores that season.
+              Different years and judging systems may not be directly comparable.
+            </p>
+            <div className="mt-6 space-y-4">
+              {seasonScorePoints.map((point) => (
+                <div key={point.year} className="grid grid-cols-[3.5rem_minmax(0,1fr)_5rem] items-center gap-3 text-sm">
+                  <span className="font-semibold text-[#002144]">{point.year}</span>
+                  <div className="h-5 overflow-hidden rounded-md bg-slate-100" aria-hidden="true">
+                    <div
+                      className="h-full rounded-md bg-[#861F41]"
+                      style={{ width: `${Math.min(100, Math.max(0, (point.average / maxSeasonAverage) * 100))}%` }}
+                    />
+                  </div>
+                  <span className="text-right font-semibold tabular-nums text-[#002144]">{scoreLabel(point.average)}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
         <div className="overflow-x-auto rounded-2xl border border-slate-200 bg-white">
-          <table className="w-full min-w-[700px] text-left text-sm">
+          <table className="w-full min-w-175 text-left text-sm">
             <thead className="bg-[#002144] text-white">
               <tr>
                 <th className="px-5 py-4">Season</th>
@@ -565,9 +607,9 @@ async function StatisticsContent({ params }: Props) {
         </div>
       </section>
 
-      <section className="space-y-5">
+      <section id="results" className="scroll-mt-28 space-y-5">
         <div>
-          <h2 className="font-serif text-2xl font-bold text-[#002144]">
+          <h2 className="text-2xl font-extrabold text-[#002144]">
             Recent Competition Results
           </h2>
 
@@ -579,7 +621,7 @@ async function StatisticsContent({ params }: Props) {
         </div>
 
         <div className="overflow-x-auto rounded-2xl border border-slate-200 bg-white">
-          <table className="w-full min-w-[900px] text-left text-sm">
+          <table className="w-full min-w-225 text-left text-sm">
             <thead className="bg-[#002144] text-white">
               <tr>
                 <th className="px-5 py-4">Date</th>
@@ -659,7 +701,7 @@ async function StatisticsContent({ params }: Props) {
         </div>
       </section>
 
-      <section className="rounded-2xl border border-slate-200 bg-white p-6">
+      <section id="methodology" className="scroll-mt-28 rounded-2xl border border-slate-200 bg-white p-6">
         <h2 className="font-bold text-[#002144]">
           How These Statistics Are Calculated
         </h2>
@@ -673,6 +715,9 @@ async function StatisticsContent({ params }: Props) {
           placements rather than inferred rankings.
         </p>
 
+        <p className="mt-3 text-sm leading-7 text-slate-600">
+          Averages include only entries with numeric total scores. They are not adjusted for judging-system differences, and a competition with multiple rounds contributes one result per round.
+        </p>
         <p className="mt-3 text-sm leading-7 text-slate-600">
           These statistics do not yet identify official
           state or national championships. Scores from

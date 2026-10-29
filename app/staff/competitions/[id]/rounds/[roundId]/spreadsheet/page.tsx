@@ -259,7 +259,7 @@ async function SpreadsheetContent({ params }: Props) {
 
   return (
     <main className="min-h-screen bg-[#F4F6F9]">
-      <section className="bg-[#002144] px-6 py-12 text-white">
+      <section className="bg-[#002144] px-6 py-6 text-white">
         <div className="mx-auto max-w-7xl">
           <Link
             href={`/staff/competitions/${id}`}
@@ -268,15 +268,15 @@ async function SpreadsheetContent({ params }: Props) {
             &larr; Competition Management
           </Link>
 
-          <p className="mt-8 text-xs font-bold uppercase tracking-widest text-[#E0B4C2]">
+          <p className="mt-4 text-xs font-bold uppercase tracking-widest text-[#E0B4C2]">
             Live Results Spreadsheet
           </p>
 
-          <h1 className="mt-3 font-serif text-3xl font-bold md:text-4xl">
+          <h1 className="mt-2 text-2xl font-bold md:text-3xl">
             {round.name}
           </h1>
 
-          <p className="mt-3 text-slate-300">
+          <p className="mt-2 text-sm text-slate-300">
             {competition.name}
             {" · "}
             {competition.organization_code}
@@ -284,13 +284,13 @@ async function SpreadsheetContent({ params }: Props) {
             {competition.season_year}
           </p>
 
-          <span className="mt-5 inline-block rounded-full bg-white/10 px-4 py-2 text-xs font-bold">
+          <span className="mt-3 inline-block rounded-full bg-white/10 px-4 py-2 text-xs font-bold">
             {editable ? "Draft — Editable" : "Read Only"}
           </span>
         </div>
       </section>
 
-      <div className="mx-auto max-w-[1600px] space-y-7 px-5 py-10">
+      <div className="mx-auto max-w-[1600px] space-y-5 px-5 py-6">
         <div>
           <h2 className="font-serif text-2xl font-bold text-[#002144]">
             Enter Competition Results

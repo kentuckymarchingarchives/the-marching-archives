@@ -6,6 +6,7 @@ import { createClient } from "@/lib/supabase/server";
 import { UUID_PATTERN } from "@/lib/band-validation";
 import { readableLabel } from "@/lib/competition-config";
 import { competitionPublicUrl } from "@/lib/public-competition-routes";
+import ArchiveControls from "@/components/ArchiveControls";
 
 export const instant = false;
 
@@ -37,41 +38,6 @@ type CompetitionRound = {
   sort_order: number;
   archived_at: string | null;
 };
-
-function formatDate(value: string | null): string {
-  if (!value) return "Date not recorded";
-
-  const date = new Date(`${value}T12:00:00Z`);
-
-  if (Number.isNaN(date.getTime())) {
-    return "Date not recorded";
-  }
-
-  return date.toLocaleDateString("en-US", {
-    dateStyle: "long",
-    timeZone: "UTC",
-  });
-}
-
-function InfoCard({
-  label,
-  value,
-}: {
-  label: string;
-  value: string | number;
-}) {
-  return (
-    <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-      <p className="text-xs font-bold uppercase tracking-wider text-slate-500">
-        {label}
-      </p>
-
-      <p className="mt-3 text-lg font-bold text-[#002144]">
-        {value}
-      </p>
-    </div>
-  );
-}
 
 async function CompetitionManagement({
   params,
@@ -161,34 +127,9 @@ async function CompetitionManagement({
     staff.role === "owner" ||
     staff.role === "admin";
 
-  const location = [
-    competition.city,
-    competition.state,
-    competition.country,
-  ]
-    .filter(Boolean)
-    .join(", ");
-
-  let sourceUrl: string | null = null;
-
-  if (competition.source_url) {
-    try {
-      const parsed = new URL(competition.source_url);
-
-      if (
-        parsed.protocol === "https:" ||
-        parsed.protocol === "http:"
-      ) {
-        sourceUrl = parsed.toString();
-      }
-    } catch {
-      sourceUrl = null;
-    }
-  }
-
   return (
     <main className="min-h-screen bg-[#F4F6F9]">
-      <section className="bg-[#002144] px-6 py-12 text-white">
+      <section className="bg-[#002144] px-6 py-8 text-white">
         <div className="mx-auto max-w-6xl">
           <Link
             href="/staff/competitions"
@@ -197,11 +138,11 @@ async function CompetitionManagement({
             &larr; All Competitions
           </Link>
 
-          <p className="mt-8 text-xs font-bold uppercase tracking-widest text-[#E0B4C2]">
+          <p className="mt-4 text-xs font-bold uppercase tracking-widest text-[#E0B4C2]">
             Competition Management
           </p>
 
-          <h1 className="mt-3 font-serif text-3xl font-bold md:text-4xl">
+          <h1 className="mt-2 text-2xl font-bold md:text-3xl">
             {competition.name}
           </h1>
 
@@ -215,7 +156,7 @@ async function CompetitionManagement({
             )}
           </p>
 
-          <div className="mt-5 flex flex-wrap gap-3">
+          <div className="mt-3 flex flex-wrap gap-3">
             <span
               className={`rounded-full px-4 py-2 text-xs font-bold ${
                 published
@@ -235,7 +176,7 @@ async function CompetitionManagement({
         </div>
       </section>
 
-      <div className="mx-auto max-w-6xl space-y-10 px-6 py-10">
+      <div className="mx-auto max-w-6xl space-y-6 px-6 py-7">
         {archived && (
           <div
             role="alert"
@@ -255,122 +196,22 @@ async function CompetitionManagement({
           </div>
         )}
 
-        {/* Accessible workflow shortcuts; authorization is enforced by each route. */}
-        <nav aria-label="Competition management workflow" className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          <a href="#competition-rounds" className="group rounded-2xl border border-slate-200 bg-white p-5 shadow-sm transition hover:border-[#861F41]/40 hover:shadow-md">
-            <span className="text-xs font-extrabold uppercase tracking-widest text-[#861F41]">01 · Enter results</span>
-            <span className="mt-2 block text-lg font-bold text-[#002144]">Rounds &amp; spreadsheets →</span>
-            <span className="mt-2 block text-sm text-slate-600">Open a round to manage scores, captions and placements.</span>
-          </a>
-          <Link href={`/staff/competitions/${id}/review`} className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm transition hover:border-[#861F41]/40 hover:shadow-md">
-            <span className="text-xs font-extrabold uppercase tracking-widest text-[#861F41]">02 · Verify</span>
-            <span className="mt-2 block text-lg font-bold text-[#002144]">Review results →</span>
-            <span className="mt-2 block text-sm text-slate-600">Inspect results and outstanding validation issues.</span>
-          </Link>
-          {canPublish ? (
-            <Link href={`/staff/competitions/${id}/publish`} className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm transition hover:border-[#861F41]/40 hover:shadow-md">
-              <span className="text-xs font-extrabold uppercase tracking-widest text-[#861F41]">03 · Owner / Admin</span>
-              <span className="mt-2 block text-lg font-bold text-[#002144]">Publish competition →</span>
-              <span className="mt-2 block text-sm text-slate-600">Review publication status and publishing controls.</span>
-            </Link>
-          ) : (
-            <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-5">
-              <span className="text-xs font-extrabold uppercase tracking-widest text-slate-500">03 · Owner / Admin</span>
-              <span className="mt-2 block text-lg font-bold text-[#002144]">Publish competition</span>
-              <span className="mt-2 block text-sm text-slate-600">Only Owners and Administrators may publish.</span>
-            </div>
-          )}
-        </nav>
-
-        <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          <InfoCard
-            label="Organization"
-            value={competition.organization_code}
-          />
-
-          <InfoCard
-            label="Season"
-            value={competition.season_year}
-          />
-
-          <InfoCard
-            label="Active Rounds"
-            value={activeRounds.length}
-          />
-
-          <InfoCard
-            label="Publication"
-            value={published ? "Published" : "Draft"}
-          />
-        </section>
-
-        <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm md:p-8">
-          <p className="text-xs font-bold uppercase tracking-widest text-[#861F41]">
-            Event Details
-          </p>
-
-          <h2 className="mt-2 font-serif text-2xl font-bold text-[#002144]">
-            Competition Information
-          </h2>
-
-          <div className="mt-6 grid gap-6 sm:grid-cols-2">
+        <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm md:p-6">
+          <div className="flex flex-wrap items-center justify-between gap-4">
             <div>
-              <p className="text-xs font-bold uppercase tracking-wider text-slate-500">
-                Date
-              </p>
-              <p className="mt-2 font-semibold text-[#002144]">
-                {formatDate(
-                  competition.competition_date
-                )}
-              </p>
+              <h2 className="text-lg font-bold text-[#002144]">Manage results</h2>
+              <p className="mt-1 text-sm text-slate-600">Select a round below to open the score spreadsheet.</p>
             </div>
-
-            <div>
-              <p className="text-xs font-bold uppercase tracking-wider text-slate-500">
-                Location
-              </p>
-              <p className="mt-2 font-semibold text-[#002144]">
-                {location || "Location not recorded"}
-              </p>
-            </div>
-
-            <div>
-              <p className="text-xs font-bold uppercase tracking-wider text-slate-500">
-                Competition Type
-              </p>
-              <p className="mt-2 font-semibold text-[#002144]">
-                {readableLabel(
-                  competition.competition_type
-                )}
-              </p>
-            </div>
-
-            <div>
-              <p className="text-xs font-bold uppercase tracking-wider text-slate-500">
-                Recorded Source
-              </p>
-
-              {sourceUrl ? (
-                <a
-                  href={sourceUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="mt-2 inline-block font-semibold text-[#861F41] hover:underline"
-                >
-                  Open Historical Source &rarr;
-                </a>
-              ) : (
-                <p className="mt-2 font-semibold text-slate-500">
-                  No source link recorded
-                </p>
-              )}
+            <div className="flex flex-wrap gap-2">
+              <Link href={`/staff/competitions/${id}/review`} className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold text-[#002144] hover:bg-slate-50">Review results</Link>
+              {canPublish && <Link href={`/staff/competitions/${id}/publish`} className="rounded-lg bg-[#861F41] px-4 py-2 text-sm font-semibold text-white hover:bg-[#701832]">Publishing</Link>}
             </div>
           </div>
         </section>
 
         <section
           id="competition-rounds"
-          className="scroll-mt-8 space-y-5"
+          className="scroll-mt-24 space-y-4"
         >
           <div>
             <p className="text-xs font-bold uppercase tracking-widest text-[#861F41]">
@@ -382,9 +223,7 @@ async function CompetitionManagement({
             </h2>
 
             <p className="mt-3 max-w-3xl text-sm leading-7 text-slate-600">
-              Select a round to manage participating bands,
-              enter total scores, edit caption results,
-              and record class and overall placements.
+              Open a round to enter or review its scores and placements.
             </p>
           </div>
 
@@ -468,58 +307,21 @@ async function CompetitionManagement({
           )}
         </section>
 
-        <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm md:p-8">
-          <p className="text-xs font-bold uppercase tracking-widest text-[#861F41]">
-            Historical Verification
-          </p>
+        {published && competition.slug && (
+          <Link href={competitionPublicUrl(competition.slug)} className="inline-block text-sm font-bold text-[#861F41] hover:underline">
+            View public competition →
+          </Link>
+        )}
 
-          <h2 className="mt-2 font-serif text-2xl font-bold text-[#002144]">
-            Review &amp; Publishing
-          </h2>
-
-          <p className="mt-3 max-w-3xl text-sm leading-7 text-slate-600">
-            Check scores and placements, resolve review
-            issues, verify historical sources, and
-            manage public publication status.
-          </p>
-
-          <div className="mt-6 flex flex-wrap gap-3">
-            <Link
-              href={`/staff/competitions/${id}/review`}
-              className="rounded-lg border border-slate-300 bg-white px-5 py-3 text-sm font-bold text-[#002144] hover:bg-slate-50"
-            >
-              Full Review Report
-            </Link>
-
-            {canPublish && (
-              <Link
-                href={`/staff/competitions/${id}/publish`}
-                className="rounded-lg bg-[#002144] px-5 py-3 text-sm font-bold text-white hover:bg-[#123B63]"
-              >
-                Review &amp; Publish &rarr;
-              </Link>
-            )}
-
-            {published && competition.slug && (
-              <Link
-                href={competitionPublicUrl(
-                  competition.slug
-                )}
-                className="rounded-lg bg-emerald-700 px-5 py-3 text-sm font-bold text-white hover:bg-emerald-800"
-              >
-                View Public Competition &rarr;
-              </Link>
-            )}
-          </div>
-
-          {!canPublish && (
-            <p className="mt-5 text-xs leading-6 text-slate-500">
-              Editors can enter and review results.
-              Only Owners and Administrators may
-              approve or publish competitions.
-            </p>
-          )}
-        </section>
+        {canPublish && (
+          <details className="rounded-xl border border-slate-200 bg-white p-5">
+            <summary className="text-sm font-bold text-[#002144]">Archive settings</summary>
+            <div className="mt-5">
+              <ArchiveControls kind="competition" recordId={competition.id} name={competition.name} archived={archived} />
+            </div>
+            <Link href="/staff/archive" className="mt-4 inline-block text-sm font-semibold text-[#861F41]">Open archive center →</Link>
+          </details>
+        )}
 
         <div className="flex flex-wrap gap-5 border-t border-slate-200 pt-6">
           <Link
