@@ -1,29 +1,23 @@
 
 import { Suspense } from "react";
 import Link from "next/link";
-import {
-  notFound,
-  permanentRedirect,
-} from "next/navigation";
+import { notFound, permanentRedirect } from "next/navigation";
 
 import { createClient } from "@/lib/supabase/server";
 import { UUID_PATTERN } from "@/lib/band-validation";
 import { BAND_SLUG_PATTERN } from "@/lib/band-slugs";
+
 import BandStatusBadge from "@/components/BandStatusBadge";
+import BandStatisticsPreview from "@/components/BandStatisticsPreview";
+import BandCompetitionHistory from "@/components/BandCompetitionHistory";
 
 type Props = {
   params: Promise<{ id: string }>;
 };
 
 function ensembleType(kind: string): string {
-  if (kind === "drum_corps") {
-    return "Drum Corps";
-  }
-
-  if (kind === "marching_band") {
-    return "Marching Band";
-  }
-
+  if (kind === "drum_corps") return "Drum Corps";
+  if (kind === "marching_band") return "Marching Band";
   return "Ensemble";
 }
 
@@ -37,13 +31,8 @@ function yearRange(
       : `${start}–${end}`;
   }
 
-  if (start !== null) {
-    return `${start}–Present`;
-  }
-
-  if (end !== null) {
-    return `Through ${end}`;
-  }
+  if (start !== null) return `${start}–Present`;
+  if (end !== null) return `Through ${end}`;
 
   return "Dates unknown";
 }
@@ -53,8 +42,6 @@ async function BandProfileContent({ params }: Props) {
 
   const supabase = await createClient();
 
-  // Preserve older UUID links by redirecting
-  // them to the band's readable public URL.
   if (UUID_PATTERN.test(id)) {
     const { data: previousBand, error } =
       await supabase
@@ -64,9 +51,7 @@ async function BandProfileContent({ params }: Props) {
         .is("archived_at", null)
         .maybeSingle();
 
-    if (error || !previousBand) {
-      notFound();
-    }
+    if (error || !previousBand) notFound();
 
     permanentRedirect(`/bands/${previousBand.slug}`);
   }
@@ -87,9 +72,7 @@ async function BandProfileContent({ params }: Props) {
     .is("archived_at", null)
     .maybeSingle();
 
-  if (error || !band) {
-    notFound();
-  }
+  if (error || !band) notFound();
 
   const { data: names, error: namesError } =
     await supabase
@@ -131,9 +114,27 @@ async function BandProfileContent({ params }: Props) {
     .filter(Boolean)
     .join(", ");
 
+  const information = [
+    {
+      label: "Ensemble Type",
+      value: ensembleType(band.kind),
+    },
+    {
+      label: "City",
+      value: band.city || "Not recorded",
+    },
+    {
+      label: "State / Region",
+      value: band.state || "Not recorded",
+    },
+    {
+      label: "Country",
+      value: band.country || "Not recorded",
+    },
+  ];
+
   return (
     <>
-      {/* Profile heading */}
       <section className="bg-[#002144] px-6 py-14 text-white md:py-20">
         <div className="mx-auto max-w-5xl">
           <Link
@@ -144,7 +145,6 @@ async function BandProfileContent({ params }: Props) {
           </Link>
 
           <div className="mt-9 flex flex-wrap items-center gap-6 md:gap-8">
-            {/* Logo beside ensemble name */}
             <div className="flex h-28 w-28 shrink-0 items-center justify-center overflow-hidden rounded-2xl border border-white/20 bg-white p-3 shadow-lg md:h-36 md:w-36">
               {logoUrl ? (
                 // eslint-disable-next-line @next/next/no-img-element
@@ -192,7 +192,6 @@ async function BandProfileContent({ params }: Props) {
         </div>
       </section>
 
-      {/* Basic profile information */}
       <div className="bg-[#F4F6F9]">
         <div className="mx-auto max-w-5xl space-y-8 px-6 py-12">
           <section className="rounded-2xl border border-slate-200 bg-white p-7 shadow-sm">
@@ -205,15 +204,17 @@ async function BandProfileContent({ params }: Props) {
             </h2>
 
             <div className="mt-6 grid gap-6 sm:grid-cols-2">
-              <div>
-                <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">
-                  Ensemble Type
-                </p>
+              {information.map((item) => (
+                <div key={item.label}>
+                  <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">
+                    {item.label}
+                  </p>
 
-                <p className="mt-2 font-bold text-[#002144]">
-                  {ensembleType(band.kind)}
-                </p>
-              </div>
+                  <p className="mt-2 font-bold text-[#002144]">
+                    {item.value}
+                  </p>
+                </div>
+              ))}
 
               <div>
                 <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">
@@ -226,40 +227,22 @@ async function BandProfileContent({ params }: Props) {
                   />
                 </div>
               </div>
-
-              <div>
-                <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">
-                  City
-                </p>
-
-                <p className="mt-2 font-bold text-[#002144]">
-                  {band.city || "Not recorded"}
-                </p>
-              </div>
-
-              <div>
-                <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">
-                  State / Region
-                </p>
-
-                <p className="mt-2 font-bold text-[#002144]">
-                  {band.state || "Not recorded"}
-                </p>
-              </div>
-
-              <div>
-                <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">
-                  Country
-                </p>
-
-                <p className="mt-2 font-bold text-[#002144]">
-                  {band.country || "Not recorded"}
-                </p>
-              </div>
             </div>
           </section>
 
-          {/* Historical names */}
+          <Suspense
+            fallback={
+              <section className="rounded-2xl border border-slate-200 bg-white p-7 text-sm text-slate-600">
+                Loading statistics overview...
+              </section>
+            }
+          >
+            <BandStatisticsPreview
+              bandId={band.id}
+              bandSlug={band.slug}
+            />
+          </Suspense>
+
           <section className="rounded-2xl border border-slate-200 bg-white p-7 shadow-sm">
             <p className="text-xs font-bold uppercase tracking-widest text-[#861F41]">
               Ensemble History
@@ -297,7 +280,6 @@ async function BandProfileContent({ params }: Props) {
             )}
           </section>
 
-          {/* Historical notes */}
           {band.notes && (
             <section className="rounded-2xl border border-slate-200 bg-white p-7 shadow-sm">
               <p className="text-xs font-bold uppercase tracking-widest text-[#861F41]">
@@ -315,6 +297,22 @@ async function BandProfileContent({ params }: Props) {
           )}
         </div>
       </div>
+
+      {/* History is rendered ONLY on the main profile,
+          not automatically on statistics or achievements. */}
+      <Suspense
+        fallback={
+          <section className="bg-[#F4F6F9] px-6 py-12">
+            <div className="mx-auto max-w-6xl rounded-2xl border border-slate-200 bg-white p-8 text-sm text-slate-600">
+              Loading competition history...
+            </div>
+          </section>
+        }
+      >
+        <BandCompetitionHistory
+          bandIdentifier={band.slug}
+        />
+      </Suspense>
     </>
   );
 }
