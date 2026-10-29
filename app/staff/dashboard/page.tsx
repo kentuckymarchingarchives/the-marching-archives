@@ -90,6 +90,7 @@ async function DashboardContent() {
         <nav aria-label="Dashboard quick links" className="flex flex-wrap gap-2">
           <a href="#manage" className="rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-semibold hover:border-[#861F41]">Manage records</a>
           <a href="#recent" className="rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-semibold hover:border-[#861F41]">Recent competitions</a>
+          <Link href="/staff/coverage" className="rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-semibold hover:border-[#861F41]">Data coverage →</Link>
           <Link href="/staff/quality" className="rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-semibold hover:border-[#861F41]">Archive quality →</Link>
           <a href="#public" className="rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-semibold hover:border-[#861F41]">Public archive</a>
         </nav>
