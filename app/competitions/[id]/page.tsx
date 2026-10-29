@@ -95,7 +95,7 @@ async function CompetitionProfile({ params }: Props) {
   const source = sourceUrl(competition.source_url);
 
   return (
-    <div className="mx-auto max-w-6xl space-y-10 px-6 py-10">
+    <div className="mx-auto max-w-7xl space-y-10 px-5 py-10 sm:px-8">
       <Link
         href="/competitions"
         className="text-sm font-semibold text-[#861F41]"
@@ -116,7 +116,7 @@ async function CompetitionProfile({ params }: Props) {
           </span>
         </div>
 
-        <h1 className="font-serif text-4xl font-bold text-[#002144] md:text-5xl">
+        <h1 className="text-4xl font-extrabold tracking-tight text-[#002144] md:text-5xl">
           {competition.name}
         </h1>
 
@@ -163,7 +163,7 @@ async function CompetitionProfile({ params }: Props) {
             Historical Results
           </p>
 
-          <h2 className="mt-2 font-serif text-3xl font-bold text-[#002144]">
+          <h2 className="mt-2 text-3xl font-extrabold tracking-tight text-[#002144]">
             Competition Rounds
           </h2>
 
