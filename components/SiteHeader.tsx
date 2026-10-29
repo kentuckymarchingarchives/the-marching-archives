@@ -12,6 +12,7 @@ const links = [
   { href: "/organizations", label: "Organizations" },
   { href: "/leaderboards", label: "Leaderboards" },
   { href: "/championships", label: "Championships" },
+  { href: "/compare", label: "Compare" },
 ];
 
 export default function SiteHeader() {

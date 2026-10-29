@@ -204,6 +204,8 @@ async function CompetitionManagement({
             </div>
             <div className="flex flex-wrap gap-2">
               <Link href={`/staff/competitions/${id}/review`} className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold text-[#002144] hover:bg-slate-50">Review results</Link>
+              <Link href={`/staff/competitions/${id}/sources`} className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold text-[#002144] hover:bg-slate-50">Manage sources</Link>
+              <Link href={`/staff/competitions/${id}/verification`} className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold text-[#002144] hover:bg-slate-50">Verification status</Link>
               {canPublish && <Link href={`/staff/competitions/${id}/publish`} className="rounded-lg bg-[#861F41] px-4 py-2 text-sm font-semibold text-white hover:bg-[#701832]">Publishing</Link>}
             </div>
           </div>

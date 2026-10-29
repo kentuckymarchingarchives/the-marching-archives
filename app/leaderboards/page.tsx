@@ -158,7 +158,7 @@ async function LeaderboardContent({ searchParams }: Props) {
           </div>
         ) : standings.length ? (
           <div className="mt-5 overflow-x-auto rounded-2xl border border-slate-200 bg-white shadow-sm">
-            <table className="w-full min-w-[680px] text-left text-sm">
+            <table className="w-full min-w-170 text-left text-sm">
               <thead className="bg-slate-100 text-xs uppercase tracking-wider text-slate-600"><tr><th className="px-5 py-4">Rank</th><th className="px-5 py-4">Ensemble</th><th className="px-4 py-4 text-right">Appearances</th><th className="px-4 py-4 text-right">Overall wins</th><th className="px-4 py-4 text-right">Class wins</th><th className="px-5 py-4 text-right">Podiums</th></tr></thead>
               <tbody className="divide-y divide-slate-100">
                 {standings.map((s, index) => (

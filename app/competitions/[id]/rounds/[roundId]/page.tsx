@@ -1,3 +1,4 @@
+  import { formatTotalScore, formatCaptionScore } from "@/lib/score-format";
 
 import { Suspense } from "react";
 import Link from "next/link";
@@ -51,21 +52,6 @@ type CaptionScore = {
   caption_id: string;
   score: number;
 };
-
-function scoreText(
-  value: number | string | null | undefined
-): string {
-  if (value === null || value === undefined) return "—";
-
-  const valueNumber = Number(value);
-
-  if (!Number.isFinite(valueNumber)) return "—";
-
-  return valueNumber
-    .toFixed(4)
-    .replace(/0+$/, "")
-    .replace(/\.$/, "");
-}
 
 function rankText(value: number | null, tied: boolean): string {
   if (value === null) return "—";
@@ -225,7 +211,7 @@ function ResultsTable({
                 </td>
 
                 <td className="px-5 py-4 text-right font-bold tabular-nums text-[#002144]">
-                  {scoreText(entry.total_score)}
+                  {formatTotalScore(entry.total_score)}
                 </td>
               </tr>
             );
@@ -621,7 +607,7 @@ async function RoundContent({ params }: Props) {
                     <p className="mt-1 text-sm text-slate-600">
                       {entry.classification ?? "Unclassified"}
                       {" · "}
-                      Total: {scoreText(entry.total_score)}
+                      Total: {formatTotalScore(entry.total_score)}
                     </p>
                   </div>
 
@@ -668,7 +654,7 @@ async function RoundContent({ params }: Props) {
                         Total Score
                       </p>
                       <p className="mt-1 font-bold tabular-nums text-[#002144]">
-                        {scoreText(entry.total_score)}
+                        {formatTotalScore(entry.total_score)}
                       </p>
                     </div>
                   </div>
@@ -695,14 +681,14 @@ async function RoundContent({ params }: Props) {
                                 {caption.name}
                               </td>
                               <td className="px-4 py-3 text-right tabular-nums">
-                                {scoreText(
+                                {formatCaptionScore(
                                   scores.get(
                                     `${entry.id}:${caption.id}`
                                   )
                                 )}
                               </td>
                               <td className="px-4 py-3 text-right tabular-nums text-slate-500">
-                                {scoreText(caption.max_score)}
+                                {formatCaptionScore(caption.max_score)}
                               </td>
                             </tr>
                           ))}
