@@ -5,6 +5,11 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { UUID_PATTERN } from "@/lib/band-validation";
 import { organizationClasses } from "@/lib/competition-config";
+import {
+  calculateScoringFormula,
+  defaultScoringFormula,
+  type ScoringFormula,
+} from "@/lib/scoring-formulas";
 
 export type SpreadsheetSaveState = {
   status: "idle" | "success" | "error";
@@ -23,55 +28,57 @@ type SubmittedRow = {
   captions: Record<string, string>;
 };
 
-const initialError = (
+function fail(
   message: string,
   savedCount = 0
-): SpreadsheetSaveState => ({
-  status: "error",
-  message,
-  savedCount,
-});
+): SpreadsheetSaveState {
+  return {
+    status: "error",
+    message,
+    savedCount,
+  };
+}
 
 function decimal(
-  value: string,
+  raw: string,
   label: string,
   max = 999999
 ): number | null {
-  if (value === "") return null;
+  if (raw === "") return null;
 
-  if (!/^\d+(?:\.\d{1,4})?$/.test(value)) {
+  if (!/^\d+(?:\.\d{1,4})?$/.test(raw)) {
     throw new Error(
-      `${label} must be a nonnegative number with no more than four decimal places.`
+      `${label} must contain no more than four decimal places.`
     );
   }
 
-  const number = Number(value);
+  const value = Number(raw);
 
-  if (!Number.isFinite(number) || number > max) {
+  if (!Number.isFinite(value) || value > max) {
     throw new Error(`Invalid ${label}.`);
   }
 
-  return number;
+  return value;
 }
 
-function rank(value: string): number | null {
-  if (value === "") return null;
+function placement(raw: string): number | null {
+  if (raw === "") return null;
 
-  if (!/^\d+$/.test(value)) {
+  if (!/^\d+$/.test(raw)) {
     throw new Error("Placements must be whole numbers.");
   }
 
-  const number = Number(value);
+  const value = Number(raw);
 
   if (
-    !Number.isSafeInteger(number) ||
-    number < 1 ||
-    number > 1000000
+    !Number.isSafeInteger(value) ||
+    value < 1 ||
+    value > 1000000
   ) {
     throw new Error("Invalid placement.");
   }
 
-  return number;
+  return value;
 }
 
 function isRow(value: unknown): value is SubmittedRow {
@@ -83,24 +90,24 @@ function isRow(value: unknown): value is SubmittedRow {
     return false;
   }
 
-  const item = value as Record<string, unknown>;
+  const row = value as Record<string, unknown>;
 
   return (
-    typeof item.entryId === "string" &&
-    UUID_PATTERN.test(item.entryId) &&
-    (item.classification === null ||
-      typeof item.classification === "string") &&
-    (item.totalMode === "automatic" ||
-      item.totalMode === "manual") &&
-    typeof item.manualTotal === "string" &&
-    typeof item.classPlacement === "string" &&
-    typeof item.overallPlacement === "string" &&
-    typeof item.notes === "string" &&
-    !!item.captions &&
-    typeof item.captions === "object" &&
-    !Array.isArray(item.captions) &&
-    Object.values(item.captions).every(
-      (score) => typeof score === "string"
+    typeof row.entryId === "string" &&
+    UUID_PATTERN.test(row.entryId) &&
+    (row.classification === null ||
+      typeof row.classification === "string") &&
+    (row.totalMode === "automatic" ||
+      row.totalMode === "manual") &&
+    typeof row.manualTotal === "string" &&
+    typeof row.classPlacement === "string" &&
+    typeof row.overallPlacement === "string" &&
+    typeof row.notes === "string" &&
+    !!row.captions &&
+    typeof row.captions === "object" &&
+    !Array.isArray(row.captions) &&
+    Object.values(row.captions).every(
+      (item) => typeof item === "string"
     )
   );
 }
@@ -112,49 +119,43 @@ export async function saveSpreadsheetResults(
   const competitionId = String(
     form.get("competition_id") ?? ""
   );
-
   const roundId = String(form.get("round_id") ?? "");
   const payload = form.get("payload");
+  const expectedFormula = form.get("formula_snapshot");
 
   if (
     !UUID_PATTERN.test(competitionId) ||
-    !UUID_PATTERN.test(roundId)
-  ) {
-    return initialError("Invalid competition or round.");
-  }
-
-  if (
+    !UUID_PATTERN.test(roundId) ||
     typeof payload !== "string" ||
-    payload.length > 500000
+    payload.length > 500000 ||
+    typeof expectedFormula !== "string" ||
+    expectedFormula.length > 30000
   ) {
-    return initialError("Invalid spreadsheet submission.");
+    return fail("Invalid spreadsheet submission.");
   }
 
-  let submitted: unknown;
+  let parsed: unknown;
 
   try {
-    submitted = JSON.parse(payload);
+    parsed = JSON.parse(payload);
   } catch {
-    return initialError("Unable to read spreadsheet data.");
+    return fail("Unable to read spreadsheet rows.");
   }
 
   if (
-    !Array.isArray(submitted) ||
-    submitted.length < 1 ||
-    submitted.length > 500 ||
-    !submitted.every(isRow)
+    !Array.isArray(parsed) ||
+    parsed.length < 1 ||
+    parsed.length > 500 ||
+    !parsed.every(isRow)
   ) {
-    return initialError(
-      "Choose between 1 and 500 valid modified rows."
-    );
+    return fail("Submit between 1 and 500 modified rows.");
   }
 
-  const rows = submitted as SubmittedRow[];
+  const rows: SubmittedRow[] = parsed;
+  const entryIds = rows.map((row) => row.entryId);
 
-  const uniqueIds = new Set(rows.map((row) => row.entryId));
-
-  if (uniqueIds.size !== rows.length) {
-    return initialError("Duplicate spreadsheet entries found.");
+  if (new Set(entryIds).size !== rows.length) {
+    return fail("Duplicate entry IDs were submitted.");
   }
 
   const supabase = await createClient();
@@ -163,9 +164,7 @@ export async function saveSpreadsheetResults(
     await supabase.auth.getClaims();
 
   if (authError || !auth?.claims?.sub) {
-    return initialError(
-      "Your staff session has expired. Sign in again."
-    );
+    return fail("Please sign into your staff account.");
   }
 
   const { data: staff, error: staffError } =
@@ -180,76 +179,105 @@ export async function saveSpreadsheetResults(
     staff?.status !== "active" ||
     !["owner", "admin", "editor"].includes(staff.role)
   ) {
-    return initialError(
-      "Active staff authorization is required."
-    );
+    return fail("Active staff access is required.");
   }
 
-  const { data: competition, error: competitionError } =
-    await supabase
-      .from("competitions")
-      .select(
-        "id, organization_code, publication_status, archived_at"
-      )
-      .eq("id", competitionId)
-      .maybeSingle();
+  const { data: competition } = await supabase
+    .from("competitions")
+    .select(
+      "organization_code, publication_status, archived_at"
+    )
+    .eq("id", competitionId)
+    .maybeSingle();
 
-  if (competitionError || !competition) {
-    return initialError("Competition not found.");
+  const { data: round } = await supabase
+    .from("competition_rounds")
+    .select("class_scope, archived_at")
+    .eq("id", roundId)
+    .eq("competition_id", competitionId)
+    .maybeSingle();
+
+  if (!competition || !round) {
+    return fail("Competition round not found.");
   }
 
   if (
     competition.publication_status !== "draft" ||
-    competition.archived_at
+    competition.archived_at ||
+    round.archived_at
   ) {
-    return initialError(
-      "Only active draft competitions can be edited."
+    return fail(
+      "Only active draft rounds can be edited."
     );
   }
 
-  const { data: round, error: roundError } =
-    await supabase
-      .from("competition_rounds")
-      .select("id, class_scope, archived_at")
-      .eq("id", roundId)
-      .eq("competition_id", competitionId)
-      .maybeSingle();
-
-  if (roundError || !round || round.archived_at) {
-    return initialError("Round not found or archived.");
-  }
-
-  const { data: entryData, error: entriesError } =
+  const { data: existing, error: entryError } =
     await supabase
       .from("competition_entries")
       .select("id")
       .eq("round_id", roundId)
-      .in("id", [...uniqueIds]);
+      .in("id", entryIds);
 
   if (
-    entriesError ||
-    (entryData ?? []).length !== uniqueIds.size
+    entryError ||
+    (existing ?? []).length !== entryIds.length
   ) {
-    return initialError(
-      "One or more entries no longer belong to this round."
+    return fail(
+      "One or more band entries no longer belong to this round."
     );
   }
 
-  const { data: captionData, error: captionsError } =
+  const { data: captionData, error: captionError } =
     await supabase
       .from("score_captions")
       .select("id, name, max_score, multiplier")
       .eq("round_id", roundId)
       .order("sort_order", { ascending: true });
 
-  if (captionsError) {
-    return initialError("Unable to validate scoring captions.");
+  if (captionError) {
+    return fail("Unable to load current scoring captions.");
+  }
+
+  const { data: savedFormula, error: formulaError } =
+    await supabase
+      .from("round_scoring_formulas")
+      .select("method, penalty, groups")
+      .eq("round_id", roundId)
+      .maybeSingle();
+
+  if (formulaError) {
+    return fail("Unable to load the round scoring formula.");
+  }
+
+  const formula: ScoringFormula = savedFormula
+    ? {
+        method: savedFormula.method as
+          ScoringFormula["method"],
+        penalty: Number(savedFormula.penalty),
+        groups: Array.isArray(savedFormula.groups)
+          ? (savedFormula.groups as
+              ScoringFormula["groups"])
+          : [],
+      }
+    : defaultScoringFormula();
+
+  if (JSON.stringify(formula) !== expectedFormula) {
+    return fail(
+      "The scoring formula changed since you opened this spreadsheet. Reload before saving."
+    );
   }
 
   const captions = captionData ?? [];
   const captionIds = new Set(
     captions.map((caption) => caption.id)
   );
+
+  const formulaCaptions = captions.map((caption) => ({
+    id: caption.id,
+    name: caption.name,
+    maxScore: Number(caption.max_score),
+    multiplier: Number(caption.multiplier),
+  }));
 
   const allowedClasses = organizationClasses(
     competition.organization_code
@@ -269,14 +297,14 @@ export async function saveSpreadsheetResults(
   }[] = [];
 
   try {
-    // Validate the ENTIRE submission before writing anything.
+    // Validate all rows before making database changes.
     for (const row of rows) {
       if (
         row.classification &&
         !allowedClasses.includes(row.classification)
       ) {
         throw new Error(
-          "A row has an invalid classification."
+          "An entry has an invalid classification."
         );
       }
 
@@ -285,100 +313,91 @@ export async function saveSpreadsheetResults(
         row.classification !== round.class_scope
       ) {
         throw new Error(
-          "A classification does not match this round."
+          "An entry's classification does not match the round."
         );
       }
 
       if (row.notes.length > 5000) {
-        throw new Error("Result notes are too long.");
+        throw new Error("Result notes exceed 5,000 characters.");
       }
 
-      const submittedCaptionIds = Object.keys(row.captions);
+      const submittedIds = Object.keys(row.captions);
 
       if (
-        submittedCaptionIds.length !== captionIds.size ||
-        submittedCaptionIds.some(
+        submittedIds.length !== captionIds.size ||
+        submittedIds.some(
           (captionId) => !captionIds.has(captionId)
         )
       ) {
         throw new Error(
-          "The scoring captions changed. Reload the spreadsheet."
+          "Scoring captions have changed. Reload the spreadsheet."
         );
       }
 
+      const scoreValues: Record<string, number | null> = {};
+
       const captionScores = captions.map((caption) => {
-        const value = decimal(
+        const score = decimal(
           row.captions[caption.id],
           caption.name,
           Number(caption.max_score)
         );
 
+        scoreValues[caption.id] = score;
+
         return {
           caption_id: caption.id,
-          score: value,
+          score,
         };
       });
 
-      let calculated: number | null = null;
+      let totalScore: number | null;
 
-      if (
-        captions.length > 0 &&
-        captionScores.every((item) => item.score !== null)
-      ) {
-        const total = captionScores.reduce(
-          (sum, item) => {
-            const caption = captions.find(
-              (candidate) => candidate.id === item.caption_id
-            )!;
-
-            return (
-              sum +
-              Number(item.score) *
-                Number(caption.multiplier)
-            );
-          },
-          0
+      if (row.totalMode === "manual") {
+        totalScore = decimal(
+          row.manualTotal,
+          "Official total"
+        );
+      } else {
+        const calculation = calculateScoringFormula(
+          formulaCaptions,
+          scoreValues,
+          formula
         );
 
-        calculated = Number(total.toFixed(4));
-
-        if (
-          !Number.isFinite(calculated) ||
-          calculated < 0 ||
-          calculated > 999999
-        ) {
+        if (calculation.status === "invalid") {
           throw new Error(
-            "Calculated total is outside the permitted range."
+            `Unable to calculate an entry: ${calculation.message}`
           );
         }
-      }
 
-      const totalScore =
-        row.totalMode === "manual"
-          ? decimal(row.manualTotal, "Official total")
-          : calculated;
+        totalScore = calculation.total;
+      }
 
       validated.push({
         entryId: row.entryId,
         classification: row.classification || null,
         totalScore,
-        classPlacement: rank(row.classPlacement),
-        overallPlacement: rank(row.overallPlacement),
+        classPlacement: placement(row.classPlacement),
+        overallPlacement: placement(
+          row.overallPlacement
+        ),
         notes: row.notes.trim() || null,
         captionScores,
       });
     }
   } catch (error) {
-    return initialError(
+    return fail(
       error instanceof Error
         ? error.message
-        : "Invalid spreadsheet values."
+        : "Invalid spreadsheet data."
     );
   }
 
   let savedCount = 0;
 
   for (const row of validated) {
+    // Reuse the existing one-entry transaction.
     const { error } = await supabase.rpc(
       "save_round_entry_result",
       {
@@ -394,17 +413,15 @@ export async function saveSpreadsheetResults(
     );
 
     if (error) {
-      console.error(
-        "Spreadsheet save failed:",
-        error.message
-      );
+      console.error("Spreadsheet save:", error.message);
 
       revalidatePath(
-        `/staff/competitions/${competitionId}/rounds/${roundId}`
+        `/staff/competitions/${competitionId}` +
+        `/rounds/${roundId}/spreadsheet`
       );
 
-      return initialError(
-        `Saving stopped after ${savedCount} of ${validated.length} modified rows. Earlier rows may have been saved. Reload the spreadsheet before retrying.`,
+      return fail(
+        `Save stopped after ${savedCount} of ${validated.length} entries. Previously saved entries may remain committed. Reload and review before retrying.`,
         savedCount
       );
     }
@@ -412,18 +429,16 @@ export async function saveSpreadsheetResults(
     savedCount++;
   }
 
-  revalidatePath(
-    `/staff/competitions/${competitionId}/rounds/${roundId}`
-  );
+  const base =
+    `/staff/competitions/${competitionId}` +
+    `/rounds/${roundId}`;
 
-  revalidatePath(
-    `/staff/competitions/${competitionId}/rounds/${roundId}/spreadsheet`
-  );
-
+  revalidatePath(base);
+  revalidatePath(`${base}/spreadsheet`);
+  revalidatePath(`${base}/tools`);
   revalidatePath(
     `/staff/competitions/${competitionId}/review`
   );
-
   revalidatePath(
     `/staff/competitions/${competitionId}/publish`
   );

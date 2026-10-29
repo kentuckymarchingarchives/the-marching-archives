@@ -6,6 +6,10 @@ import { notFound, redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { UUID_PATTERN } from "@/lib/band-validation";
 import { organizationClasses } from "@/lib/competition-config";
+import {
+  defaultScoringFormula,
+  type ScoringFormula,
+} from "@/lib/scoring-formulas";
 
 import LiveResultsSpreadsheet, {
   type SpreadsheetCaption,
@@ -21,7 +25,7 @@ type Props = {
   }>;
 };
 
-function textValue(
+function asText(
   value: number | string | null | undefined
 ): string {
   return value === null || value === undefined
@@ -63,28 +67,22 @@ async function SpreadsheetContent({ params }: Props) {
     redirect("/staff/login?error=unauthorized");
   }
 
-  const { data: competition, error: competitionError } =
-    await supabase
-      .from("competitions")
-      .select(
-        "id, name, season_year, organization_code, publication_status, archived_at"
-      )
-      .eq("id", id)
-      .maybeSingle();
+  const { data: competition } = await supabase
+    .from("competitions")
+    .select(
+      "id, name, season_year, organization_code, publication_status, archived_at"
+    )
+    .eq("id", id)
+    .maybeSingle();
 
-  if (competitionError || !competition) {
-    notFound();
-  }
+  const { data: round } = await supabase
+    .from("competition_rounds")
+    .select("id, name, class_scope, archived_at")
+    .eq("id", roundId)
+    .eq("competition_id", id)
+    .maybeSingle();
 
-  const { data: round, error: roundError } =
-    await supabase
-      .from("competition_rounds")
-      .select("id, name, class_scope, archived_at")
-      .eq("id", roundId)
-      .eq("competition_id", id)
-      .maybeSingle();
-
-  if (roundError || !round) {
+  if (!competition || !round) {
     notFound();
   }
 
@@ -93,7 +91,7 @@ async function SpreadsheetContent({ params }: Props) {
     !competition.archived_at &&
     !round.archived_at;
 
-  const [entryResult, captionResult] =
+  const [entriesResponse, captionsResponse, formulaResponse] =
     await Promise.all([
       supabase
         .from("competition_entries")
@@ -112,26 +110,48 @@ async function SpreadsheetContent({ params }: Props) {
         )
         .eq("round_id", roundId)
         .order("sort_order", { ascending: true }),
+
+      supabase
+        .from("round_scoring_formulas")
+        .select("method, penalty, groups")
+        .eq("round_id", roundId)
+        .maybeSingle(),
     ]);
 
-  if (entryResult.error || captionResult.error) {
+  if (
+    entriesResponse.error ||
+    captionsResponse.error ||
+    formulaResponse.error
+  ) {
     throw new Error(
-      "Unable to load spreadsheet entries or captions."
+      "Unable to load results, captions, or formula settings."
     );
   }
 
-  const entries = entryResult.data ?? [];
+  const entries = entriesResponse.data ?? [];
 
   const captions: SpreadsheetCaption[] =
-    (captionResult.data ?? []).map((caption) => ({
+    (captionsResponse.data ?? []).map((caption) => ({
       id: caption.id,
       name: caption.name,
       max_score: Number(caption.max_score),
       multiplier: Number(caption.multiplier),
     }));
 
+  const saved = formulaResponse.data;
+
+  const formula: ScoringFormula = saved
+    ? {
+        method: saved.method as ScoringFormula["method"],
+        penalty: Number(saved.penalty),
+        groups: Array.isArray(saved.groups)
+          ? (saved.groups as ScoringFormula["groups"])
+          : [],
+      }
+    : defaultScoringFormula();
+
   const incomplete =
-    (entryResult.count ?? 0) > entries.length;
+    (entriesResponse.count ?? 0) > entries.length;
 
   const bandIds = [
     ...new Set(entries.map((entry) => entry.band_id)),
@@ -146,9 +166,7 @@ async function SpreadsheetContent({ params }: Props) {
       .in("id", bandIds.slice(i, i + 75));
 
     if (error) {
-      throw new Error(
-        "Unable to load spreadsheet band names."
-      );
+      throw new Error("Unable to load ensemble names.");
     }
 
     for (const band of data ?? []) {
@@ -156,22 +174,16 @@ async function SpreadsheetContent({ params }: Props) {
     }
   }
 
-  const scores = new Map<string, string>();
-
+  const savedScores = new Map<string, string>();
   const entryIds = entries.map((entry) => entry.id);
 
-  // Load caption scores in small batches so the
-  // database's default row limits don't silently
-  // omit values.
   for (let i = 0; i < entryIds.length; i += 25) {
-    const batch = entryIds.slice(i, i + 25);
-
     const { data, count, error } = await supabase
       .from("caption_scores")
       .select("entry_id, caption_id, score", {
         count: "exact",
       })
-      .in("entry_id", batch)
+      .in("entry_id", entryIds.slice(i, i + 25))
       .limit(1000);
 
     if (
@@ -179,47 +191,48 @@ async function SpreadsheetContent({ params }: Props) {
       (count ?? 0) > (data?.length ?? 0)
     ) {
       throw new Error(
-        "Caption score data exceeded the safe loading limit."
+        "Unable to safely load all caption scores."
       );
     }
 
     for (const item of data ?? []) {
-      scores.set(
+      savedScores.set(
         `${item.entry_id}:${item.caption_id}`,
-        textValue(item.score)
+        asText(item.score)
       );
     }
   }
 
   const rows: SpreadsheetRow[] = entries.map(
     (entry) => {
-      const captionValues: Record<string, string> = {};
+      const values: Record<string, string> = {};
 
       for (const caption of captions) {
-        captionValues[caption.id] =
-          scores.get(`${entry.id}:${caption.id}`) ?? "";
+        values[caption.id] =
+          savedScores.get(
+            `${entry.id}:${caption.id}`
+          ) ?? "";
       }
 
       return {
         entryId: entry.id,
         bandName:
-          bandNames.get(entry.band_id) ?? "Unknown Ensemble",
+          bandNames.get(entry.band_id) ??
+          "Unknown Ensemble",
         classification: entry.classification,
-        // Preserve existing official totals unless the
-        // editor deliberately switches to automatic.
         totalMode:
           entry.total_score !== null
             ? "manual"
             : "automatic",
-        manualTotal: textValue(entry.total_score),
-        classPlacement: textValue(
+        manualTotal: asText(entry.total_score),
+        classPlacement: asText(
           entry.class_placement
         ),
-        overallPlacement: textValue(
+        overallPlacement: asText(
           entry.overall_placement
         ),
         notes: entry.notes ?? "",
-        captions: captionValues,
+        captions: values,
       };
     }
   );
@@ -227,6 +240,10 @@ async function SpreadsheetContent({ params }: Props) {
   rows.sort((a, b) =>
     a.bandName.localeCompare(b.bandName)
   );
+
+  const base =
+    `/staff/competitions/${id}` +
+    `/rounds/${roundId}`;
 
   return (
     <main className="min-h-screen bg-[#F4F6F9]">
@@ -243,7 +260,7 @@ async function SpreadsheetContent({ params }: Props) {
             Live Results Spreadsheet
           </p>
 
-          <h1 className="mt-3 font-serif text-3xl font-bold md:text-4xl">
+          <h1 className="mt-3 font-serif text-4xl font-bold">
             {round.name}
           </h1>
 
@@ -255,9 +272,11 @@ async function SpreadsheetContent({ params }: Props) {
             {competition.season_year}
           </p>
 
-          <span className="mt-5 inline-block rounded-full bg-white/10 px-4 py-2 text-xs font-bold">
-            {editable ? "Draft — Editable" : "Read Only"}
-          </span>
+          <p className="mt-4 text-sm font-semibold text-[#E0B4C2]">
+            {editable
+              ? "Draft — Editable"
+              : "Read-Only Results"}
+          </p>
         </div>
       </section>
 
@@ -268,11 +287,18 @@ async function SpreadsheetContent({ params }: Props) {
           </h2>
 
           <p className="mt-3 max-w-4xl text-sm leading-7 text-slate-600">
-            Enter caption scores across the table.
-            Calculated totals and preliminary rankings
-            update immediately. Review official results,
-            classifications, and placements before saving.
+            Caption values calculate live using this
+            round's configured formula. Official totals
+            and recorded placements can still be entered
+            manually when needed.
           </p>
+
+          <Link
+            href={`${base}/formula`}
+            className="mt-3 inline-block text-sm font-bold text-[#861F41] hover:underline"
+          >
+            Review Scoring Formula &rarr;
+          </Link>
         </div>
 
         <LiveResultsSpreadsheet
@@ -285,6 +311,7 @@ async function SpreadsheetContent({ params }: Props) {
           captions={captions}
           initialRows={rows}
           incomplete={incomplete}
+          formula={formula}
         />
       </div>
     </main>
@@ -295,13 +322,8 @@ export default function SpreadsheetPage(props: Props) {
   return (
     <Suspense
       fallback={
-        <main className="min-h-screen bg-[#F4F6F9] px-6 py-12">
-          <p
-            role="status"
-            className="mx-auto max-w-7xl text-sm text-slate-600"
-          >
-            Loading live results spreadsheet...
-          </p>
+        <main className="min-h-screen bg-[#F4F6F9] p-10 text-sm text-slate-600">
+          Loading spreadsheet...
         </main>
       }
     >
