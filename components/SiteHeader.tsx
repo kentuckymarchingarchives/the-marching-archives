@@ -39,7 +39,7 @@ export default function SiteHeader() {
 
   return (
     <header ref={rootRef} className="sticky top-0 z-50 border-b border-[#E5E9EF] bg-white shadow-[0_2px_16px_rgba(0,33,68,0.04)]">
-      <div className="mx-auto flex min-h-[94px] max-w-[1500px] items-center justify-between gap-4 px-4 py-2 sm:px-6 lg:px-8">
+      <div className="mx-auto flex min-h-23.5 max-w-375 items-center justify-between gap-4 px-4 py-2 sm:px-6 lg:px-8">
         <Link href="/" onClick={closeAll} aria-label="The Marching Archives — home" className="flex min-w-0 shrink-0 items-center gap-3">
           <Image
             src="/tma-logo.png"
@@ -47,7 +47,7 @@ export default function SiteHeader() {
             width={76}
             height={76}
             priority
-            className="h-[64px] w-[64px] shrink-0 object-contain sm:h-[76px] sm:w-[76px]"
+            className="h-16 w-16 shrink-0 object-contain sm:h-19 sm:w-19"
           />
           <span className="min-w-0">
             <span className="block text-[17px] font-extrabold leading-tight tracking-tight text-[#002144] sm:text-[22px]">
@@ -89,7 +89,7 @@ export default function SiteHeader() {
                 </svg>
               </button>
               {openGroup === group.label && (
-                <div id={`nav-${group.label.toLowerCase()}`} className="absolute right-0 top-full z-50 w-[306px] pt-3">
+                <div id={`nav-${group.label.toLowerCase()}`} className="absolute right-0 top-full z-50 w-76.5 pt-3">
                   <div className="rounded-xl border border-[#DFE5EC] bg-white p-2 shadow-[0_18px_46px_rgba(0,33,68,.16)]">
                     <div className="px-3 pb-2 pt-2 text-[10px] font-extrabold uppercase tracking-[.18em] text-[#861F41]">
                       {group.label}
@@ -126,7 +126,7 @@ export default function SiteHeader() {
 
       {mobileOpen && (
         <nav id="mobile-site-navigation" aria-label="Mobile navigation" className="max-h-[calc(100dvh-94px)] overflow-y-auto border-t border-[#E5E9EF] bg-white px-4 pb-5 pt-3 xl:hidden">
-          <div className="mx-auto max-w-[1500px]">
+          <div className="mx-auto max-w-375">
             {primaryNavigation.map((link) => (
               <Link key={link.href} href={link.href} onClick={closeAll} className="block rounded-lg px-3 py-3 text-sm font-bold text-[#002144] hover:bg-[#F2F5F8]">{link.label}</Link>
             ))}

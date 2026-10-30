@@ -9,7 +9,7 @@ import { competitionPublicUrl } from "@/lib/public-competition-routes";
 import BandLogo from "@/components/BandLogo";
 import OrganizationMark from "@/components/OrganizationMark";
 
-export const instant = false;
+
 
 const PAGE_SIZE = 12;
 
@@ -251,8 +251,8 @@ function SearchForm({ filters }: { filters: Filters }) {
   ].filter(Boolean).length;
 
   return (
-    <section aria-labelledby="search-filters-heading" className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 px-6 py-5 md:px-8">
+    <section aria-labelledby="search-filters-heading" className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-[0_16px_50px_-35px_rgba(0,33,68,0.35)]">
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 bg-[#f9fafc] px-6 py-5 md:px-8">
         <div>
           <p className="text-xs font-extrabold uppercase tracking-[0.18em] text-[#861F41]">Find a record</p>
           <h2 id="search-filters-heading" className="mt-1 text-xl font-extrabold tracking-tight text-[#002144]">Search &amp; refine</h2>
@@ -274,7 +274,7 @@ function SearchForm({ filters }: { filters: Filters }) {
           </div>
         </div>
 
-        <details className="group rounded-xl border border-slate-200 bg-slate-50/70 p-5" open={activeFilters > 1}>
+        <details className="group rounded-2xl border border-slate-200 bg-[#f9fafc] p-5" open={activeFilters > 1}>
           <summary className="flex cursor-pointer list-none items-center justify-between gap-2 text-sm font-extrabold text-[#002144] [&::-webkit-details-marker]:hidden">
             Advanced filters
             <span className="text-xs font-semibold text-[#861F41] group-open:hidden">Show filters +</span>
@@ -317,9 +317,8 @@ function SearchForm({ filters }: { filters: Filters }) {
             Location filters both. Former ensemble names are included when recorded.
           </p>
         </details>
-        <p className="text-sm text-slate-600">Looking for a specific score or placement? <Link href="/search/results" className="font-bold text-[#861F41] underline underline-offset-4">Search individual competition results →</Link></p>
         <div className="flex flex-wrap items-center gap-3">
-          <button type="submit" className="rounded-xl bg-[#861F41] px-7 py-3.5 text-sm font-extrabold text-white transition hover:bg-[#6d1733]">Search archive →</button>
+          <button type="submit" className="rounded-xl bg-[#861F41] px-7 py-3.5 text-sm font-extrabold text-white shadow-sm transition hover:bg-[#6d1733] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#861F41]">Search archive →</button>
           <Link href="/search" className="rounded-xl border border-slate-300 bg-white px-6 py-3.5 text-sm font-bold text-[#002144] hover:bg-slate-50">Reset filters</Link>
         </div>
       </form>
@@ -501,7 +500,7 @@ async function SearchContent({
     process.env.NEXT_PUBLIC_SUPABASE_URL ?? "";
 
   return (
-    <div className="mx-auto max-w-7xl space-y-10 px-6 py-10 md:px-8 md:py-14">
+    <div className="mx-auto max-w-7xl space-y-10 px-6 py-10 md:px-8 md:py-16">
       <SearchForm filters={filters} />
 
       {invalidRange && (
@@ -542,7 +541,7 @@ async function SearchContent({
           <div className="grid gap-4 sm:grid-cols-2">
             <a
               href="#ensembles"
-              className="group rounded-2xl border border-slate-200 bg-white p-6 shadow-sm transition hover:-translate-y-0.5 hover:border-[#861F41]/50 hover:shadow-md"
+              className="group rounded-3xl border border-slate-200 bg-white p-6 shadow-sm transition hover:-translate-y-0.5 hover:border-[#861F41]/50 hover:shadow-md"
             >
               <p className="text-xs font-bold uppercase tracking-widest text-[#861F41]">
                 Matching Ensembles
@@ -561,7 +560,7 @@ async function SearchContent({
 
             <a
               href="#competitions"
-              className="group rounded-2xl border border-slate-200 bg-white p-6 shadow-sm transition hover:-translate-y-0.5 hover:border-[#861F41]/50 hover:shadow-md"
+              className="group rounded-3xl border border-slate-200 bg-white p-6 shadow-sm transition hover:-translate-y-0.5 hover:border-[#861F41]/50 hover:shadow-md"
             >
               <p className="text-xs font-bold uppercase tracking-widest text-[#861F41]">
                 Matching Competitions
@@ -821,17 +820,17 @@ export default function SearchPage(props: Props) {
   return (
     <main className="min-h-screen bg-[#f6f7f9]">
       <section className="relative overflow-hidden bg-[#002144] px-6 py-14 text-white md:py-20">
-        <div className="pointer-events-none absolute right-48 top-48 h-128 w-lg rounded-full bg-[#861F41]/25 blur-3xl" />
+        <div className="pointer-events-none absolute right-[-12rem] top-[-12rem] h-[32rem] w-[32rem] rounded-full bg-[#861F41]/25 blur-3xl" />
         <div className="relative mx-auto max-w-7xl md:px-2">
           <nav aria-label="Breadcrumb" className="mb-7 text-sm text-slate-300">
             <Link href="/" className="hover:text-white">Home</Link> <span className="mx-2 text-slate-500">/</span> <span aria-current="page" className="font-semibold text-white">Search</span>
           </nav>
-          <p className="text-xs font-extrabold uppercase tracking-[0.2em] text-[#e6a9bc]">Research the archive</p>
-          <h1 className="mt-4 max-w-3xl text-4xl font-extrabold tracking-tight md:text-6xl">Find the history behind every result.</h1>
+          <p className="text-xs font-extrabold uppercase tracking-[0.2em] text-[#e6a9bc]">The Marching Archives / Discover</p>
+          <h1 className="mt-4 max-w-3xl text-4xl font-extrabold tracking-tight md:text-6xl">Search an archive of performance.</h1>
           <p className="mt-5 max-w-2xl text-base leading-8 text-slate-200 md:text-lg">
-            Search bands, drum corps, and published competitions in one place. Narrow your results by location, organization, season, and event type.
+            Search documented bands, corps, and competitive events together. Discover historic ensemble names, narrow your search by organization, and explore season-by-season records.
           </p>
-          <div className="mt-7 flex flex-wrap gap-3 text-sm font-semibold">
+          <div className="mt-8 flex flex-wrap gap-3 text-sm font-semibold">
             <a href="#ensembles" className="rounded-full border border-white/25 bg-white/10 px-4 py-2 text-white hover:bg-white/20">Ensembles ↓</a>
             <a href="#competitions" className="rounded-full border border-white/25 bg-white/10 px-4 py-2 text-white hover:bg-white/20">Competitions ↓</a>
           </div>
