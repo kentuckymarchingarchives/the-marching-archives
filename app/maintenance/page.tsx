@@ -1,9 +1,11 @@
+
 import type { Metadata } from "next";
 import SectionOffline from "@/components/SectionOffline";
 
 export const metadata: Metadata = {
   title: "Section Offline | The Marching Archives",
-  description: "This section of The Marching Archives is temporarily unavailable.",
+  description:
+    "This section of The Marching Archives is temporarily unavailable.",
   robots: { index: false, follow: true },
 };
 

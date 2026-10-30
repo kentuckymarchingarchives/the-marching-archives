@@ -1,283 +1,42 @@
-
 import Link from "next/link";
-import Image from "next/image";
-import { ORGANIZATION_LIST } from "@/lib/organization-branding";
 
-const destinations = [
-  {
-    number: "01",
-    title: "Bands & Corps",
-    desc: "Browse profiles, competitive histories, achievements, and statistics for individual ensembles.",
-    href: "/bands",
-    cta: "Explore directory",
-  },
-  {
-    number: "02",
-    title: "Competitions & Results",
-    desc: "Find events, rounds, placements, scores, and archived competition results.",
-    href: "/competitions",
-    cta: "View competitions",
-  },
-  {
-    number: "03",
-    title: "Organizations",
-    desc: "Explore the organizations behind the events and the records in the archive.",
-    href: "/organizations",
-    cta: "Browse organizations",
-  },
+const entries = [
+  { index: "01", category: "Ensembles", title: "Bands & Corps", description: "Explore the programs behind the performances, with competitive histories, achievements, and statistics.", href: "/bands", action: "Browse ensembles" },
+  { index: "02", category: "The historical record", title: "Competitions & Results", description: "Find contests by season, follow rounds, and examine documented placements and scores.", href: "/competitions", action: "Explore results" },
+  { index: "03", category: "The organizations", title: "Organizations", description: "Discover the circuits and associations that shape the competitive marching arts.", href: "/organizations", action: "Explore organizations" },
+];
+
+const features = [
+  { label: "Search", title: "Find the record you need", desc: "Start with a name, a competition, or a year. Follow the evidence from there.", href: "/search" },
+  { label: "Browse", title: "Move through the seasons", desc: "Explore competition history with a clear view of events and their results.", href: "/competitions" },
+  { label: "Research", title: "Understand the context", desc: "Connect a score to its ensemble, competition, and larger competitive story.", href: "/bands" },
 ];
 
 export default function HomePage() {
-  return (
-    <main className="bg-[#f6f7f9] text-[#002144]">
-      <section className="relative overflow-hidden bg-[#002144] text-white">
-        <div
-          className="absolute inset-0 opacity-30"
-          style={{
-            backgroundImage:
-              "radial-gradient(circle at 85% 20%, #861F41 0, transparent 38%), linear-gradient(130deg,transparent 30%,#14486d 100%)",
-          }}
-        />
-
-        <div className="relative mx-auto grid max-w-7xl gap-12 px-6 py-20 md:px-8 md:py-28 lg:grid-cols-[1.3fr_.7fr] lg:items-center">
-          <div>
-            <span className="inline-flex rounded-full border border-white/20 bg-white/10 px-4 py-2 text-xs font-bold uppercase tracking-[.2em] text-[#f0c6d3]">
-              The competitive marching arts archive
-            </span>
-
-            <h1 className="mt-7 max-w-3xl text-5xl font-extrabold leading-[1.07] tracking-tight sm:text-6xl lg:text-7xl">
-              The history behind{" "}
-              <span className="text-[#e6a9bc]">every result.</span>
-            </h1>
-
-            <p className="mt-7 max-w-2xl text-lg leading-8 text-slate-200">
-              Discover the bands, competitions, scores, and achievements
-              that shaped the marching arts. One archive, built to make
-              competitive history easier to find.
-            </p>
-
-            <form
-              action="/search"
-              method="get"
-              role="search"
-              className="mt-9 flex max-w-xl flex-col gap-2 rounded-xl bg-white p-2 shadow-2xl sm:flex-row"
-            >
-              <label htmlFor="home-search" className="sr-only">
-                Search the archive
-              </label>
-              <input
-                id="home-search"
-                name="q"
-                placeholder="Search bands, competitions, and more…"
-                className="min-w-0 flex-1 rounded-lg px-4 py-3 text-base text-slate-900 outline-none placeholder:text-slate-400"
-              />
-              <button
-                type="submit"
-                className="rounded-lg bg-[#861F41] px-6 py-3 font-bold text-white hover:bg-[#6d1733]"
-              >
-                Search archive
-              </button>
-            </form>
-
-            <p className="mt-4 text-sm text-slate-300">
-              Or{" "}
-              <Link
-                href="/bands"
-                className="font-semibold text-white underline underline-offset-4"
-              >
-                browse all bands
-              </Link>{" "}
-              and{" "}
-              <Link
-                href="/competitions"
-                className="font-semibold text-white underline underline-offset-4"
-              >
-                competition results
-              </Link>
-              .
-            </p>
-          </div>
-
-          <div className="hidden lg:block">
-            <div className="rounded-3xl border border-white/15 bg-white/10 p-7 shadow-2xl backdrop-blur">
-              <div className="mb-6 flex items-center justify-between">
-                <span className="text-xs font-bold uppercase tracking-[.2em] text-[#f0c6d3]">
-                  Inside the archive
-                </span>
-                <span className="h-2.5 w-2.5 rounded-full bg-[#e6a9bc]" />
-              </div>
-
-              {[
-                { label: "Explore", value: "Ensemble histories" },
-                { label: "Discover", value: "Event results" },
-                { label: "Research", value: "Scores & placements" },
-                { label: "Compare", value: "Competitive statistics" },
-              ].map((item, i) => (
-                <div
-                  key={item.label}
-                  className="flex items-center gap-4 border-t border-white/15 py-5"
-                >
-                  <span className="text-2xl font-light text-[#e6a9bc]">
-                    0{i + 1}
-                  </span>
-                  <div>
-                    <p className="text-xs uppercase tracking-widest text-slate-300">
-                      {item.label}
-                    </p>
-                    <p className="mt-1 text-lg font-bold">{item.value}</p>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
+  return <main className="bg-[#f6f7f8] text-[#002144]">
+    <section className="tma-hero relative isolate overflow-hidden bg-[#002144] text-white">
+      <div aria-hidden="true" className="tma-hero-grain absolute inset-0 pointer-events-none" />
+      <div className="relative mx-auto grid min-h-160 max-w-330 items-center gap-14 px-6 py-20 md:px-8 lg:grid-cols-[1.2fr_.8fr] lg:py-28">
+        <div>
+          <p className="inline-flex items-center gap-3 text-[11px] font-black uppercase tracking-[.24em] text-[#e9b9ca]"><span className="h-0.5 w-8 bg-[#d77a9b]" />The Marching Archives</p>
+          <h1 className="mt-7 max-w-197.5 text-[clamp(3.4rem,6.5vw,6.5rem)] font-black leading-[.99] tracking-[-.075em]">Every result has <span className="text-[#e8afc2]">a story.</span></h1>
+          <p className="mt-8 max-w-xl text-base leading-8 text-[#d2dce5] sm:text-lg">Explore the competition results, ensembles, scores, and achievements that shaped the marching arts. History, organized for discovery.</p>
+          <form role="search" action="/search" method="get" className="mt-9 flex max-w-162.5 flex-col gap-2 rounded-2xl bg-white p-2.5 shadow-[0_24px_65px_rgba(0,0,0,.2)] sm:flex-row">
+            <label htmlFor="tma-search" className="sr-only">Search the archive</label>
+            <input id="tma-search" type="search" name="q" placeholder="Search bands, competitions, and years…" className="min-w-0 flex-1 rounded-xl px-4 py-3.5 text-[15px] text-[#002144] outline-none placeholder:text-[#7b8998]" />
+            <button type="submit" className="rounded-xl bg-[#861F41] px-7 py-3.5 text-sm font-extrabold text-white transition hover:bg-[#6f1937]">Search the archive ↗</button>
+          </form>
+          <div className="mt-7 flex flex-wrap items-center gap-5 text-sm font-semibold"><Link href="/competitions" className="text-white underline decoration-[#d77a9b] decoration-2 underline-offset-8 hover:text-[#e8afc2]">Browse competition results</Link><Link href="/bands" className="text-[#d2dce5] transition hover:text-white">Explore bands & corps →</Link></div>
         </div>
-      </section>
+        <div className="relative hidden lg:block"><div className="absolute -right-10 -top-10 h-64 w-64 rounded-full bg-[#861F41]/30 blur-[80px]"/><div className="tma-record-card relative rotate-2 rounded-[28px] border border-white/20 bg-white/10 p-7 shadow-2xl backdrop-blur-md"><div className="flex items-center justify-between border-b border-white/20 pb-6"><span className="text-[11px] font-black uppercase tracking-[.25em] text-[#e8afc2]">An archive of competition</span><span className="text-3xl font-light text-white/50">✳</span></div><div className="py-8"><p className="text-[11px] font-bold uppercase tracking-[.26em] text-slate-300">Preserving the record</p><p className="mt-4 text-4xl font-black tracking-[-.06em]">The moments.<br/>The scores.<br/><span className="text-[#e8afc2]">The legacy.</span></p></div><div className="grid grid-cols-2 gap-3 border-t border-white/20 pt-6">{["Historical results","Ensemble histories","Competitive records","Verified research"].map((text,i)=><div key={text} className="flex items-start gap-2 text-xs font-semibold text-[#e4ebf1]"><span className="font-black text-[#e8afc2]">0{i+1}</span>{text}</div>)}</div></div></div>
+      </div>
+      <div className="relative border-t border-white/15"><div className="mx-auto flex max-w-330 flex-wrap gap-x-12 gap-y-3 px-6 py-5 text-[10px] font-bold uppercase tracking-[.19em] text-[#b7c7d6] md:px-8"><span>Competition records</span><span>Scores & placements</span><span>Marching arts history</span><span>Independent research</span></div></div>
+    </section>
 
-      <section className="mx-auto max-w-7xl px-6 py-20 md:px-8">
-        <div className="flex flex-wrap items-end justify-between gap-4">
-          <div>
-            <p className="text-xs font-extrabold uppercase tracking-[.2em] text-[#861F41]">
-              Find your way
-            </p>
-            <h2 className="mt-3 text-3xl font-extrabold tracking-tight sm:text-4xl">
-              Explore the archive
-            </h2>
-          </div>
-          <Link
-            href="/search"
-            className="text-sm font-bold text-[#861F41] hover:underline"
-          >
-            Advanced search →
-          </Link>
-        </div>
+    <section className="mx-auto max-w-330 px-6 py-20 md:px-8 md:py-24"><div className="flex flex-wrap items-end justify-between gap-6"><div><p className="tma-eyebrow">Discover the archive</p><h2 className="mt-4 text-4xl font-black tracking-[-.055em] sm:text-5xl">Start exploring<span className="text-[#861F41]">.</span></h2></div><Link href="/search" className="text-sm font-extrabold text-[#861F41] hover:underline">Advanced search ↗</Link></div><div className="mt-10 grid gap-5 md:grid-cols-3">{entries.map(entry=><Link key={entry.index} href={entry.href} className="tma-feature-card group flex min-h-85 flex-col rounded-[22px] border border-[#e0e5eb] bg-white p-8 shadow-[0_8px_30px_rgba(0,33,68,.035)] transition duration-300 hover:-translate-y-1 hover:border-[#d9a2b4] hover:shadow-[0_18px_50px_rgba(0,33,68,.09)]"><div className="flex items-center justify-between"><span className="text-xs font-black uppercase tracking-[.18em] text-[#861F41]">{entry.category}</span><span className="text-4xl font-light text-[#c7d0da]">{entry.index}</span></div><h3 className="mt-12 text-[27px] font-black leading-tight tracking-tighter">{entry.title}</h3><p className="mt-4 text-sm leading-7 text-[#5a697b]">{entry.description}</p><span className="mt-auto pt-8 text-sm font-extrabold text-[#861F41] group-hover:underline">{entry.action} ↗</span></Link>)}</div></section>
 
-        <div className="mt-9 grid gap-5 md:grid-cols-3">
-          {destinations.map((d) => (
-            <Link
-              href={d.href}
-              key={d.number}
-              className="group flex min-h-72 flex-col rounded-2xl border border-slate-200 bg-white p-8 shadow-sm transition hover:-translate-y-1 hover:border-[#861F41]/40 hover:shadow-xl"
-            >
-              <span className="text-sm font-black text-[#861F41]">
-                {d.number} / EXPLORE
-              </span>
-              <h3 className="mt-7 text-2xl font-extrabold tracking-tight">
-                {d.title}
-              </h3>
-              <p className="mt-4 leading-7 text-slate-600">{d.desc}</p>
-              <span className="mt-auto pt-8 text-sm font-extrabold text-[#861F41]">
-                {d.cta} →
-              </span>
-            </Link>
-          ))}
-        </div>
-      </section>
+    <section className="border-y border-[#e1e6eb] bg-white"><div className="mx-auto grid max-w-330 gap-12 px-6 py-20 md:px-8 lg:grid-cols-[.95fr_1.05fr] lg:items-center"><div><p className="tma-eyebrow">Made for curiosity</p><h2 className="mt-4 max-w-xl text-4xl font-black leading-[1.08] tracking-[-.055em] sm:text-5xl">Follow the history. Find the details.</h2><p className="mt-6 max-w-lg text-base leading-8 text-[#617082]">Whether you're revisiting a championship performance or researching an ensemble's competitive record, the archive keeps the results connected to their historical context.</p><Link href="/search" className="mt-8 inline-flex rounded-xl bg-[#002144] px-6 py-3.5 text-sm font-extrabold text-white transition hover:bg-[#173c61]">Begin your research ↗</Link></div><div className="grid gap-3">{features.map((item,i)=><Link href={item.href} key={item.label} className="group flex items-start gap-5 rounded-2xl border border-[#e3e8ed] bg-[#fafbfc] p-6 transition hover:border-[#d7a2b5] hover:bg-white"><span className="mt-1 text-xs font-black text-[#861F41]">0{i+1}</span><span className="flex-1"><span className="block text-lg font-black tracking-tight">{item.title}</span><span className="mt-2 block text-sm leading-6 text-[#647487]">{item.desc}</span></span><span className="text-lg text-[#861F41] transition group-hover:translate-x-1">↗</span></Link>)}</div></div></section>
 
-      <section className="border-y border-slate-200 bg-white">
-        <div className="mx-auto grid max-w-7xl gap-10 px-6 py-16 md:grid-cols-[.8fr_1.2fr] md:items-center md:px-8">
-          <div>
-            <p className="text-xs font-extrabold uppercase tracking-[.2em] text-[#861F41]">
-              Built for discovery
-            </p>
-            <h2 className="mt-3 text-3xl font-extrabold tracking-tight">
-              From a single score to a lasting legacy.
-            </h2>
-            <p className="mt-5 leading-8 text-slate-600">
-              Explore historical results by competition, then follow an
-              ensemble&apos;s competitive record to see placements,
-              achievements, and statistics in context.
-            </p>
-            <Link
-              href="/search"
-              className="mt-7 inline-flex rounded-lg bg-[#002144] px-6 py-3 font-bold text-white hover:bg-[#123b63]"
-            >
-              Start exploring →
-            </Link>
-          </div>
-
-          <div className="grid gap-3 sm:grid-cols-2">
-            {[
-              "Competition results",
-              "Band & corps profiles",
-              "Placements and scores",
-              "Achievements and statistics",
-            ].map((t, i) => (
-              <div
-                key={t}
-                className="rounded-xl border border-slate-200 bg-[#f6f7f9] p-6"
-              >
-                <span className="text-xs font-bold text-[#861F41]">
-                  0{i + 1}
-                </span>
-                <p className="mt-5 text-lg font-extrabold">{t}</p>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      <section className="mx-auto max-w-7xl px-6 py-20 md:px-8">
-        <p className="text-xs font-extrabold uppercase tracking-[.2em] text-[#861F41]">
-          Archive coverage
-        </p>
-        <div className="mt-3 flex flex-wrap items-end justify-between gap-4">
-          <h2 className="text-3xl font-extrabold tracking-tight sm:text-4xl">
-            Organizations we document
-          </h2>
-          <Link
-            href="/organizations"
-            className="text-sm font-bold text-[#861F41] hover:underline"
-          >
-            View organizations →
-          </Link>
-        </div>
-
-        <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          {ORGANIZATION_LIST.map((o) => (
-            <Link
-              href="/organizations"
-              key={o.code}
-              className="flex flex-col items-center rounded-xl border border-slate-200 bg-white p-6 text-center transition hover:border-[#861F41]/40 hover:shadow-md"
-            >
-              <div className="flex h-24 w-full items-center justify-center">
-                <Image
-                  src={o.logo}
-                  alt={`${o.name} logo`}
-                  width={180}
-                  height={85}
-                  className="max-h-20 w-auto max-w-full object-contain"
-                />
-              </div>
-              <strong className="mt-5 text-base">{o.name}</strong>
-              <span className="mt-1 text-xs font-semibold uppercase tracking-wider text-slate-500">
-                {o.code}
-              </span>
-            </Link>
-          ))}
-        </div>
-
-        <p className="mt-7 text-xs leading-6 text-slate-500">
-          The Marching Archives is independent and is not affiliated
-          with or endorsed by these organizations. Logos and trademarks
-          belong to their respective owners.
-        </p>
-      </section>
-
-      <section className="bg-[#002144] px-6 py-16 text-center text-white">
-        <h2 className="text-3xl font-extrabold">
-          History is still being written.
-        </h2>
-        <p className="mx-auto mt-4 max-w-2xl leading-7 text-slate-300">
-          The archive continues to grow as additional historical
-          competition records are documented and verified.
-        </p>
-        <Link
-          href="/competitions"
-          className="mt-7 inline-flex rounded-lg bg-[#861F41] px-6 py-3 font-bold text-white hover:bg-[#a02b52]"
-        >
-          Explore results →
-        </Link>
-      </section>
-    </main>
-  );
+    <section className="mx-auto max-w-330 px-6 py-20 md:px-8"><div className="rounded-[28px] bg-[#eee9eb] px-8 py-12 sm:px-12 lg:flex lg:items-center lg:justify-between lg:gap-10"><div><p className="tma-eyebrow">The people behind the records</p><h2 className="mt-4 text-3xl font-black tracking-tighter sm:text-4xl">Meet the team preserving the past.</h2><p className="mt-4 max-w-2xl text-sm leading-7 text-[#566678]">The Marching Archives is built by people who care about accurate, accessible competitive history.</p></div><Link href="/team" className="mt-7 inline-flex shrink-0 rounded-xl bg-[#861F41] px-6 py-3.5 text-sm font-extrabold text-white transition hover:bg-[#6e1734] lg:mt-0">Meet the team ↗</Link></div></section>
+  </main>;
 }

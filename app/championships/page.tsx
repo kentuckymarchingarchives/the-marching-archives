@@ -76,6 +76,7 @@ async function ChampionshipContent({ searchParams }: Props) {
         <p className="mt-7 text-xs font-bold uppercase tracking-[0.22em] text-[#e6a9bc]">Historical archive</p>
         <h1 className="mt-3 text-4xl font-extrabold tracking-tight sm:text-5xl">Championship Records</h1>
         <p className="mt-5 max-w-3xl leading-8 text-slate-200">Browse published championship events and open their recorded finals results by year, organization, and classification.</p>
+        <Link href="/records" className="mt-5 inline-flex rounded-lg border border-white/30 px-4 py-2 text-sm font-bold text-white hover:bg-white/10">Explore championship milestones →</Link>
       </div>
     </section>
     <main className="mx-auto max-w-7xl px-5 pb-20 sm:px-8">
