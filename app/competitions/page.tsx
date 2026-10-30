@@ -62,7 +62,7 @@ async function Directory({ searchParams }: Props) {
 
   return (
     <div className="mx-auto max-w-7xl px-5 pb-20 sm:px-8">
-      <div className="relative -mt-8 rounded-2xl border border-slate-200 bg-white p-5 shadow-lg sm:p-7">
+      <div className="relative -mt-12 rounded-3xl border border-slate-200 bg-white p-5 shadow-xl shadow-[#002144]/6 sm:p-8">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
             <h2 className="text-lg font-extrabold text-[#002144]">Find a competition</h2>
@@ -108,12 +108,12 @@ async function Directory({ searchParams }: Props) {
         {error ? (
           <div role="alert" className="rounded-2xl border border-red-200 bg-red-50 p-8 text-red-800">Unable to load competitions. Please try again.</div>
         ) : data?.length ? (
-          <div className="grid gap-4 md:grid-cols-2">
+          <div className="grid gap-5 md:grid-cols-2">
             {data.map((competition) => {
               const href = competitionPublicUrl(competition.slug);
               const location = [competition.city, competition.state, competition.country].filter(Boolean).join(", ") || "Location not recorded";
               return (
-                <article key={competition.id} className="group flex min-w-0 flex-col rounded-2xl border border-slate-200 bg-white p-6 shadow-sm transition hover:border-[#861F41]/40 hover:shadow-lg">
+                <article key={competition.id} className="group flex min-w-0 flex-col rounded-3xl border border-slate-200 bg-white p-6 shadow-sm transition duration-200 hover:-translate-y-0.5 hover:border-[#861F41]/40 hover:shadow-xl hover:shadow-[#002144]/[0.07] sm:p-7">
                   <div className="flex items-start gap-4">
                     <div className="shrink-0"><OrganizationMark code={competition.organization_code} size="medium" linked /></div>
                     <div className="min-w-0 flex-1">
@@ -157,13 +157,13 @@ async function Directory({ searchParams }: Props) {
 export default function CompetitionsPage(props: Props) {
   return (
     <main className="min-h-screen bg-[#f6f7f9]">
-      <section className="bg-[#002144] px-5 pb-20 pt-14 text-white sm:px-8 sm:pt-20">
-        <div className="mx-auto max-w-7xl">
+      <section className="relative overflow-hidden bg-[#002144] px-5 pb-24 pt-14 text-white sm:px-8 sm:pb-28 sm:pt-20">
+        <div aria-hidden="true" className="pointer-events-none absolute -right-28 -top-44 h-135 w-135 rounded-full border-90 border-white/[0.035]" />
+        <div className="relative mx-auto max-w-7xl">
           <nav aria-label="Breadcrumb" className="mb-7 text-sm text-slate-300"><Link href="/" className="hover:text-white">Home</Link><span className="mx-2" aria-hidden="true">/</span><span className="text-white">Competitions</span></nav>
           <p className="text-xs font-extrabold uppercase tracking-[0.22em] text-[#e6a9bc]">Competitive history, preserved</p>
-          <h1 className="mt-4 text-4xl font-extrabold tracking-tight sm:text-5xl">Competitions &amp; Results</h1>
-          <Link href="/seasons" className="mt-5 inline-flex rounded-lg border border-white/30 px-4 py-2 text-sm font-bold text-white hover:bg-white/10">Browse by season →</Link>
-          <p className="mt-5 max-w-2xl text-base leading-8 text-slate-200 sm:text-lg">Search historical competitions, discover event rounds, and explore recorded placements, scores, and awards.</p>
+          <h1 className="mt-4 max-w-4xl text-4xl font-black tracking-tight sm:text-6xl">A record of every <span className="text-[#e8afc2]">competition.</span></h1>
+          <p className="mt-5 max-w-2xl text-base leading-8 text-slate-200 sm:text-lg">Explore documented competitions, follow championship rounds, and discover the scores and placements that shaped marching history.</p>
         </div>
       </section>
       <Suspense fallback={<div className="mx-auto max-w-7xl px-6 py-12 text-sm text-slate-600">Loading competitions…</div>}>

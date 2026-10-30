@@ -12,14 +12,6 @@ import {
 
 export const instant = false;
 
-type PublicSource = {
-  id: string;
-  title: string;
-  source_type: string | null;
-  citation: string | null;
-  url: string | null;
-};
-
 type Props = {
   params: Promise<{ id: string }>;
 };
@@ -102,21 +94,8 @@ async function CompetitionProfile({ params }: Props) {
 
   const source = sourceUrl(competition.source_url);
 
-  // The RPC returns public citation fields only. Internal staff notes,
-  // contributor IDs and review metadata are not exposed.
-  const { data: reviewedSources, error: sourcesError } =
-    await supabase.rpc("tma_public_competition_sources", {
-      p_competition_id: competition.id,
-    });
-
-  if (sourcesError) {
-    console.error("Unable to retrieve reviewed sources:", sourcesError.message);
-    throw new Error("Unable to retrieve competition citations.");
-  }
-
-
   return (
-    <div className="mx-auto max-w-7xl space-y-10 px-5 py-10 sm:px-8">
+    <div className="mx-auto max-w-7xl space-y-10 px-5 pb-20 pt-8 sm:px-8">
       <Link
         href="/competitions"
         className="text-sm font-semibold text-[#861F41]"
@@ -124,12 +103,14 @@ async function CompetitionProfile({ params }: Props) {
         ← All Competitions
       </Link>
 
-      <header className="space-y-5">
+      <header className="relative overflow-hidden rounded-3xl bg-[#002144] px-6 py-10 text-white shadow-lg sm:px-10 sm:py-14">
+        <div aria-hidden="true" className="pointer-events-none absolute -right-28 -top-28 h-80 w-80 rounded-full border-54 border-white/4" />
+        <div className="relative space-y-6">
         <div className="flex flex-wrap gap-3">
-          <span className="rounded-full bg-[#002144] px-4 py-2 text-xs font-bold text-white">
+          <span className="rounded-full bg-[#861F41] px-4 py-2 text-xs font-bold text-white">
             {competition.organization_code}
           </span>
-          <span className="rounded-full border border-slate-200 bg-white px-4 py-2 text-xs font-bold text-[#002144]">
+          <span className="rounded-full border border-white/25 bg-white/10 px-4 py-2 text-xs font-bold text-white">
             {competition.season_year} Season
           </span>
           <span className="rounded-full border border-emerald-200 bg-emerald-50 px-4 py-2 text-xs font-bold text-emerald-800">
@@ -137,13 +118,14 @@ async function CompetitionProfile({ params }: Props) {
           </span>
         </div>
 
-        <h1 className="text-4xl font-extrabold tracking-tight text-[#002144] md:text-5xl">
+        <h1 className="max-w-4xl text-4xl font-black tracking-tight text-white md:text-6xl">
           {competition.name}
         </h1>
 
         <p className="text-lg text-slate-600">
           {label(competition.competition_type)}
         </p>
+        </div>
       </header>
 
       <section className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
@@ -203,10 +185,10 @@ async function CompetitionProfile({ params }: Props) {
                   competition.slug,
                   round.slug
                 )}
-                className="group cursor-pointer rounded-2xl border border-slate-200 bg-white p-6 shadow-sm transition hover:border-[#861F41] hover:shadow-md"
+                className="group cursor-pointer rounded-3xl border border-slate-200 bg-white p-6 shadow-sm transition duration-200 hover:-translate-y-0.5 hover:border-[#861F41]/50 hover:shadow-lg"
               >
                 <div className="flex items-start gap-4">
-                  <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-[#002144] font-bold text-white">
+                  <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-[#002144] font-black text-white">
                     {index + 1}
                   </span>
 
@@ -257,80 +239,24 @@ async function CompetitionProfile({ params }: Props) {
         </section>
       )}
 
-      <section id="sources" className="scroll-mt-28 rounded-2xl border border-slate-200 bg-white p-7">
-        <div className="flex flex-wrap items-start justify-between gap-3">
-          <div>
-            <p className="text-xs font-bold uppercase tracking-widest text-[#861F41]">
-              Documentation
-            </p>
-            <h2 className="mt-2 text-2xl font-bold text-[#002144]">
-              Historical Sources
-            </h2>
-          </div>
-          <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600">
-            {reviewedSources?.length ?? 0} reviewed references
-          </span>
-        </div>
+      <section className="rounded-2xl border border-slate-200 bg-white p-7">
+        <h2 className="text-2xl font-bold text-[#002144]">
+          Historical Sources
+        </h2>
 
-        <p className="mt-3 text-sm leading-6 text-slate-600">
-          Reviewed means an archive administrator has checked the citation;
-          it does not guarantee every detail in the historical record.
-        </p>
-
-        {reviewedSources?.length ? (
-          <ol className="mt-6 divide-y divide-slate-100 rounded-xl border border-slate-200">
-            {reviewedSources.map((reference: PublicSource) => {
-              const link = sourceUrl(reference.url);
-              return (
-                <li key={reference.id} className="p-5">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <h3 className="font-bold text-[#002144]">{reference.title}</h3>
-                    <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-600">
-                      {label(reference.source_type)}
-                    </span>
-                  </div>
-                  {reference.citation && (
-                    <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-slate-600">
-                      {reference.citation}
-                    </p>
-                  )}
-                  {link && (
-                    <a
-                      href={link}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="mt-3 inline-block text-sm font-bold text-[#861F41] hover:underline"
-                    >
-                      Open source ↗
-                    </a>
-                  )}
-                </li>
-              );
-            })}
-          </ol>
+        {source ? (
+          <a
+            href={source}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="mt-4 inline-block font-bold text-[#861F41]"
+          >
+            View Recorded Source ↗
+          </a>
         ) : (
-          <p className="mt-5 rounded-xl bg-slate-50 p-4 text-sm text-slate-600">
-            No reviewed source citations are publicly available yet.
+          <p className="mt-3 text-sm text-slate-600">
+            No online source has been recorded.
           </p>
-        )}
-
-        {source && (
-          <div className="mt-5 border-t border-slate-100 pt-5">
-            <p className="text-xs font-bold uppercase tracking-wider text-slate-500">
-              Original competition reference
-            </p>
-            <a
-              href={source}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="mt-2 inline-block text-sm font-bold text-[#861F41] hover:underline"
-            >
-              View previously recorded source ↗
-            </a>
-            <p className="mt-1 text-xs text-slate-500">
-              Legacy source link; not included in the reviewed citation count.
-            </p>
-          </div>
         )}
       </section>
 
@@ -357,7 +283,7 @@ export default function PublicCompetitionPage(
   props: Props
 ) {
   return (
-    <main className="min-h-screen bg-[#F4F6F9]">
+    <main className="min-h-screen bg-[#f6f7f9]">
       <Suspense
         fallback={
           <div className="mx-auto max-w-6xl px-6 py-10 text-sm text-slate-600">
