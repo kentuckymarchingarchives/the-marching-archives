@@ -1,4 +1,4 @@
-/** Central navigation registry: desktop and mobile menus read the same arrays. */
+/** Shared public navigation. Update URLs here once for desktop and mobile. */
 export const primaryNavigation = [
   { label: "Bands & Corps", href: "/bands" },
   { label: "Competitions", href: "/competitions" },
@@ -8,29 +8,28 @@ export const navigationGroups = [
   {
     label: "Explore",
     links: [
-      { label: "Organizations", href: "/organizations", description: "Explore competition organizations" },
-      { label: "Season Explorer", href: "/seasons", description: "Discover results by year" },
-      { label: "Championships", href: "/championships", description: "Browse championship records" },
-      { label: "Historical Documents", href: "/documents", description: "Research and archival sources" },
+      { label: "Organizations", href: "/organizations", description: "Competitive organizations" },
+      { label: "Season Explorer", href: "/seasons", description: "Browse history by season" },
+      { label: "Championships", href: "/championships", description: "Championship results and records" },
+      { label: "Historical Documents", href: "/documents", description: "Documents and archive sources" },
     ],
   },
   {
     label: "Statistics",
     links: [
-      { label: "Leaderboards", href: "/leaderboards", description: "All-time archive rankings" },
-      { label: "Power Rankings", href: "/power-rankings", description: "Manually published KMEA & BOA rankings" },
-      { label: "Ranking History", href: "/power-rankings/history", description: "Ranking movement over time" },
-      { label: "Compare Bands", href: "/compare", description: "Compare ensemble records" },
+      { label: "Leaderboards", href: "/leaderboards", description: "Historical leaders and records" },
+      { label: "Power Rankings", href: "/power-rankings", description: "Published KMEA and BOA rankings" },
+      { label: "Ranking History", href: "/power-rankings/history", description: "Rank changes across editions" },
+      { label: "Compare Bands", href: "/compare", description: "Side-by-side ensemble comparisons" },
     ],
   },
   {
     label: "About",
     links: [
-      { label: "Meet the Team", href: "/team", description: "People behind the archive" },
-      { label: "Submit a Correction", href: "/corrections", description: "Help improve historical records" },
+      { label: "Meet the Team", href: "/team", description: "The people behind the archive" },
+      { label: "Submit a Correction", href: "/corrections", description: "Help improve archive accuracy" },
     ],
   },
 ] as const;
 
-// Change a URL here if your deployed route has a different name.
-// Adding a link here updates BOTH the desktop and mobile navigation.
+export const searchNavigation = { label: "Search Archive", href: "/search" } as const;
