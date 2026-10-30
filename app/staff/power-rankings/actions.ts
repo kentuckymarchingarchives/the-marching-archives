@@ -91,3 +91,44 @@ export async function addSection(form: FormData) {
  const {error}=await db.from("power_ranking_sections").insert({edition_id,kind,name,classification,parent_section_id,max_entries,numbered,sort_order:kind==="class"?20:kind==="additional"?10:0});
  failure(error);revalidatePath(`/staff/power-rankings/${edition_id}`);
 }
+
+
+// Edits always target an existing draft. Publishing and unpublishing remain admin-only.
+export async function updateRanking(form: FormData) {
+  const {db}=await authorized();
+  const id=value(form,"id"), edition=value(form,"edition"), section=value(form,"section");
+  const band=value(form,"band");
+  const rawRank=value(form,"rank"), rawRating=value(form,"rating");
+  const rating=rawRating===""?null:Number(rawRating);
+  const rank=rawRank===""?null:Number(rawRank);
+  if(![id,edition,section,band].every(v=>uuid.test(v)) ||
+     (rank!==null&&(!Number.isInteger(rank)||rank<1||rank>10000)) ||
+     (rating!==null&&(!Number.isFinite(rating)||Math.abs(rating)>99999999))) throw new Error("Invalid ranking values.");
+  const {data:entry,error:readError}=await db.from("power_ranking_entries").select("id,section_id").eq("id",id).eq("edition_id",edition).single();
+  failure(readError);
+  if(entry?.section_id!==section) throw new Error("Entries cannot move between sections while editing.");
+  const {data:sec,error:sectionError}=await db.from("power_ranking_sections").select("numbered").eq("id",section).eq("edition_id",edition).single();
+  failure(sectionError);
+  if(!sec || (sec.numbered && rank===null) || (!sec.numbered && rank!==null)) throw new Error("Position doesn't match this section.");
+  const {error}=await db.from("power_ranking_entries").update({band_id:band,rank,rating,note:value(form,"note").slice(0,500)||null}).eq("id",id).eq("edition_id",edition);
+  failure(error);
+  revalidatePath(`/staff/power-rankings/${edition}`);
+  revalidatePath("/power-rankings");
+}
+
+export async function updateSection(form: FormData) {
+  const {db}=await authorized();
+  const edition=value(form,"edition"),id=value(form,"section");
+  const name=value(form,"name").slice(0,80);
+  const maxText=value(form,"limit");
+  const max_entries=maxText===""?null:Number(maxText);
+  const sort_order=Number(value(form,"order"));
+  if(!uuid.test(edition)||!uuid.test(id)||!name||
+    (max_entries!==null&&(!Number.isInteger(max_entries)||max_entries<1||max_entries>1000))||
+    !Number.isInteger(sort_order)||sort_order<0||sort_order>10000) throw new Error("Invalid section details.");
+  const {error}=await db.from("power_ranking_sections")
+    .update({name,max_entries,sort_order}).eq("id",id).eq("edition_id",edition);
+  failure(error);
+  revalidatePath(`/staff/power-rankings/${edition}`);
+  revalidatePath("/power-rankings");
+}
