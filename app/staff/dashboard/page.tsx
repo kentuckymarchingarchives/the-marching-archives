@@ -18,7 +18,14 @@ const reviewTools: Shortcut[] = [
   { title: "Archive Quality", detail: "Identify missing or unreviewed sources", href: "/staff/quality", symbol: "AQ" },
   { title: "Data Coverage", detail: "Track documented seasons and organizations", href: "/staff/coverage", symbol: "DC" },
   { title: "Corrections", detail: "Review community-submitted corrections", href: "/staff/corrections", symbol: "CR" },
-  { title: "Notifications", detail: "New reports, pending sources, and draft competitions", href: "/staff/notifications", symbol: "NT" },
+  { title: "Notifications", detail: "Corrections, sources, and unpublished records", href: "/staff/notifications", symbol: "NT" },
+  { title: "Research Assignments", detail: "Team tasks, priority, and progress", href: "/staff/research", symbol: "RA" },
+  { title: "Duplicate Detection", detail: "Review potential duplicate historical records", href: "/staff/duplicates", symbol: "DD" },
+];
+
+const administrationTools: Shortcut[] = [
+  { title: "Staff Management", detail: "Roles, account access, and staff status", href: "/staff/team", symbol: "TM" },
+  { title: "Activity & Audit Log", detail: "Review documented changes to archive records", href: "/staff/activity", symbol: "AL" },
 ];
 
 function ToolCard({ item }: { item: Shortcut }) {
@@ -56,7 +63,7 @@ async function DashboardContent() {
   const canPublish = staff.role === "owner" || staff.role === "admin";
   const roleLabel = staff.role === "owner" ? "Owner" : staff.role === "admin" ? "Administrator" : "Editor";
 
-  const [bandCount, competitionCount, publishedCount, draftCount, latestResponse] = await Promise.all([
+  const [bandCount, competitionCount, publishedCount, draftCount, latestResponse, tasksOpen, tasksMine, corrections, sources, teamCount, auditEvents, recentTasks] = await Promise.all([
     supabase.from("bands").select("id", { count: "exact", head: true }),
     supabase.from("competitions").select("id", { count: "exact", head: true }).is("archived_at", null),
     supabase.from("competitions").select("id", { count: "exact", head: true }).is("archived_at", null).eq("publication_status", "published"),
@@ -65,6 +72,13 @@ async function DashboardContent() {
       .select("id, name, organization_code, season_year, publication_status")
       .is("archived_at", null).order("season_year", { ascending: false })
       .order("name", { ascending: true }).limit(6),
+    supabase.from("research_assignments").select("id", { count: "exact", head: true }).neq("status", "completed"),
+    supabase.from("research_assignments").select("id", { count: "exact", head: true }).eq("assigned_to", userId).neq("status", "completed"),
+    supabase.from("archive_correction_submissions").select("id", { count: "exact", head: true }).eq("status", "new"),
+    supabase.from("competition_sources").select("id", { count: "exact", head: true }).is("reviewed_at", null),
+    canPublish ? supabase.from("staff_members").select("user_id", { count: "exact", head: true }).eq("status", "active") : Promise.resolve({count:null,error:null}),
+    canPublish ? supabase.from("archive_audit_events").select("id,table_name,operation,occurred_at").order("occurred_at", { ascending: false }).limit(5) : Promise.resolve({data:[],error:null}),
+    supabase.from("research_assignments").select("id,title,status,priority,due_date,assigned_to").neq("status", "completed").order("updated_at", { ascending: false }).limit(5),
   ]);
 
   const latest = latestResponse.data ?? [];
@@ -101,6 +115,18 @@ async function DashboardContent() {
           <Metric label="Not yet published" value={activeDrafts} description="Records to finish or review" href="/staff/competitions" />
         </section>
 
+        <section aria-label="Work requiring attention" className="space-y-3">
+          <div className="flex flex-wrap items-end justify-between gap-3">
+            <div><p className="text-xs font-bold uppercase tracking-widest text-[#861F41]">Live work queues</p><h2 className="mt-1 text-xl font-extrabold">What needs attention</h2></div>
+            <Link href="/staff/notifications" className="text-sm font-bold text-[#861F41] hover:underline">Full attention center →</Link>
+          </div>
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            <Metric label="My open tasks" value={tasksMine.error ? null : tasksMine.count} description="Assignments waiting on you" href="/staff/research?mine=1" />
+            <Metric label="Team open tasks" value={tasksOpen.error ? null : tasksOpen.count} description="Tasks not yet completed" href="/staff/research" />
+            <Metric label="New corrections" value={corrections.error ? null : corrections.count} description="Community submissions to review" href="/staff/corrections?status=new" />
+            <Metric label="Unreviewed sources" value={sources.error ? null : sources.count} description="Source citations awaiting review" href="/staff/quality" />
+          </div>
+        </section>
         <div className="grid gap-6 lg:grid-cols-[minmax(0,1.45fr)_minmax(0,1fr)]">
           <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
             <div className="flex flex-wrap items-center justify-between gap-2"><div><p className="text-xs font-bold uppercase tracking-widest text-[#861F41]">Continue working</p><h2 className="mt-1 text-xl font-extrabold">Competitions to open</h2></div><Link href="/staff/competitions" className="text-sm font-bold text-[#861F41] hover:underline">View all →</Link></div>
@@ -131,6 +157,17 @@ async function DashboardContent() {
           </section>
         </div>
 
+        <div className="grid gap-6 lg:grid-cols-2">
+          <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
+            <div className="flex items-start justify-between gap-3"><div><p className="text-xs font-bold uppercase tracking-widest text-[#861F41]">Research workspace</p><h2 className="mt-1 text-xl font-extrabold">Active assignments</h2></div><Link href="/staff/research" className="text-sm font-bold text-[#861F41] hover:underline">All tasks →</Link></div>
+            {recentTasks.error ? <p className="mt-4 text-sm text-amber-800">Research assignments are unavailable. Confirm migration 022 and staff permissions.</p> : !recentTasks.data?.length ? <p className="mt-4 text-sm text-slate-500">No active research assignments.</p> : <ul className="mt-3 divide-y divide-slate-100">{recentTasks.data.map(task => <li key={task.id} className="flex items-center justify-between gap-3 py-3"><div className="min-w-0"><p className="truncate text-sm font-semibold">{task.title}</p><p className="mt-1 text-xs text-slate-500">{task.status.replaceAll("_", " ")} · {task.priority}{task.assigned_to === userId ? " · Assigned to you" : ""}</p></div><span className="shrink-0 text-xs text-slate-500">{task.due_date ?? "No due date"}</span></li>)}</ul>}
+          </section>
+          {canPublish ? <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
+            <div className="flex items-start justify-between gap-3"><div><p className="text-xs font-bold uppercase tracking-widest text-[#861F41]">Owner / Administrator</p><h2 className="mt-1 text-xl font-extrabold">Recent archive changes</h2></div><Link href="/staff/activity" className="text-sm font-bold text-[#861F41] hover:underline">Audit log →</Link></div>
+            {auditEvents.error ? <p className="mt-4 text-sm text-amber-800">Audit events are unavailable. Confirm migration 021.</p> : !auditEvents.data?.length ? <p className="mt-4 text-sm text-slate-500">No recorded changes yet.</p> : <ul className="mt-3 divide-y divide-slate-100">{auditEvents.data.map(event => <li key={event.id} className="flex items-center justify-between gap-3 py-3"><div><p className="text-sm font-semibold">{event.table_name.replaceAll("_", " ")}</p><p className="mt-1 text-xs text-slate-500">{event.operation}</p></div><time className="text-xs text-slate-500" dateTime={event.occurred_at}>{new Date(event.occurred_at).toLocaleDateString("en-US",{month:"short",day:"numeric"})}</time></li>)}</ul>}
+          </section> : <section className="rounded-2xl border border-slate-200 bg-white p-5 sm:p-6"><h2 className="text-xl font-extrabold">Your research workflow</h2><p className="mt-2 text-sm leading-6 text-slate-600">Open Research Assignments to continue assigned tasks and update progress.</p><Link href="/staff/research?mine=1" className="mt-4 inline-flex rounded-lg bg-[#002144] px-4 py-2 text-sm font-bold text-white">View my tasks →</Link></section>}
+        </div>
+        {canPublish && <section className="space-y-3"><div className="flex flex-wrap items-end justify-between gap-3"><div><p className="text-xs font-bold uppercase tracking-widest text-[#861F41]">Restricted administration</p><h2 className="mt-1 text-xl font-extrabold">Team & accountability</h2></div><p className="text-xs text-slate-500">Active staff: {teamCount.error || teamCount.count === null ? "Unavailable" : teamCount.count.toLocaleString()}</p></div><div className="grid gap-3 md:grid-cols-2">{administrationTools.filter(tool => staff.role === "owner" || tool.href !== "/staff/team").map(tool => <ToolCard key={tool.href} item={tool} />)}</div></section>}
         <section>
           <div className="mb-4"><p className="text-xs font-bold uppercase tracking-widest text-[#861F41]">Record management</p><h2 className="mt-1 text-2xl font-extrabold">Your archive tools</h2><p className="mt-2 text-sm text-slate-600">Open a dedicated workspace without scrolling through repeated controls.</p></div>
           <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">{recordTools.map((tool) => <ToolCard item={tool} key={tool.href} />)}</div>
@@ -143,6 +180,7 @@ async function DashboardContent() {
           <div><h2 className="text-xl font-extrabold">Preview the public archive</h2><p className="mt-1 text-sm text-slate-300">Check what visitors can see after updating records.</p></div>
           <div className="flex flex-wrap gap-2"><Link href="/bands" className="rounded-lg bg-white px-4 py-2 text-sm font-bold text-[#002144]">Bands & Corps</Link><Link href="/competitions" className="rounded-lg border border-white/40 px-4 py-2 text-sm font-bold">Competitions</Link><Link href="/power-rankings" className="rounded-lg border border-white/40 px-4 py-2 text-sm font-bold">Power Rankings</Link></div>
         </section>
+        {staff.role === "owner" && <section className="rounded-2xl border border-slate-200 bg-white p-5 sm:p-6"><p className="text-xs font-bold uppercase tracking-widest text-[#861F41]">Infrastructure</p><h2 className="mt-1 text-xl font-extrabold">Backup & recovery</h2><p className="mt-2 text-sm text-slate-600">Run and check encrypted backups under your GitHub repository’s Actions tab. Backups are not activated merely by installing this dashboard; configure Phase 6 secrets and verify a successful test first.</p><p className="mt-3 text-xs text-slate-500">Guide in the repository: <code>docs/BACKUP-AND-RESTORE.md</code></p></section>}
         <p className="text-xs leading-5 text-slate-500">Some tools (Power Rankings, Corrections, Documents, Quality, Coverage) require their separate feature installations and database migrations. A link may lead to a 404 until that feature has been deployed. All permissions continue to be enforced by the linked pages and server actions.</p>
       </div>
     </main>
