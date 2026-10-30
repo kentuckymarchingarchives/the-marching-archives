@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { Suspense } from "react";
 import { createClient } from "@/lib/supabase/server";
+import PowerRankingTrendChart from "@/components/PowerRankingTrendChart";
 
 type Params = { organization?: string; year?: string; band?: string; view?: string; classification?: string };
 type Props = { searchParams: Promise<Params> };
@@ -91,6 +92,7 @@ async function HistoryContent({ searchParams }: Props) {
       {bandSlug&&!band&&!bandError&&<p className="rounded-xl border bg-white p-5">No band found with that URL slug. Open a band profile and use its final URL segment.</p>}
       {band&&!errors.length&&!truncated&&<section className="rounded-2xl border bg-white p-6">
         <div className="flex flex-wrap items-start justify-between gap-4"><div><p className="text-xs font-bold uppercase tracking-widest text-[#861F41]">{organization} · {year} · {view==="class"?`Class ${classification}`:"Overall"}</p><h2 className="mt-2 text-2xl font-extrabold">{band.name}</h2><p className="mt-1 text-sm text-slate-500">{editions.length} published edition{editions.length===1?"":"s"} documented</p></div><Link href={`/bands/${band.slug}`} className="text-sm font-semibold text-[#861F41] hover:underline">Band profile →</Link></div>
+        <PowerRankingTrendChart editions={rows.map(r => ({ id: r.edition.id, label: r.edition.title, rank: r.rank, description: r.description }))} />
         <div className="mt-6 overflow-x-auto"><table className="w-full min-w-140 text-left text-sm"><thead><tr className="border-b text-slate-500"><th className="py-3 pr-3">Edition</th><th className="pr-3">Publication date</th><th className="pr-3">Recorded position / group</th><th>Change</th></tr></thead><tbody>{rows.map(r=><tr key={r.edition.id} className="border-b last:border-0"><td className="py-4 pr-3 font-semibold"><Link className="hover:underline" href={`/power-rankings?organization=${organization}&year=${year}&edition=${r.edition.id}`}>{r.edition.title}</Link></td><td className="pr-3 text-slate-500"><EditionDate value={r.edition.published_on}/></td><td className="pr-3">{r.description}</td><td className={r.movement.startsWith("↑")?"font-semibold text-emerald-700":r.movement.startsWith("↓")?"font-semibold text-red-700":"text-slate-500"}>{r.movement}</td></tr>)}</tbody></table></div>
         {!rows.length&&<p className="mt-5 text-slate-500">No published ranking editions were found for these filters.</p>}
         <p className="mt-5 text-xs leading-6 text-slate-500">Movement compares each edition only with the immediately preceding published edition of the same season and ranking type, when both contain numbered positions. Unlisted bands and unnumbered additional groups are never assigned an inferred rank. Editions without publication dates follow record creation order as a fallback.</p>
