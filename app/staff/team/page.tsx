@@ -2,10 +2,10 @@ import { Suspense } from "react";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { saveStaffMember } from "./actions";
+import { saveStaffMember, saveStaffBio } from "./actions";
 
-type Staff = { user_id: string; role: string; status: string; created_at: string; display_name: string | null; greeting_name: string | null };
-type Props = { searchParams: Promise<{ error?: string; saved?: string }> };
+type Staff = { user_id: string; role: string; status: string; created_at: string; display_name: string | null; greeting_name: string | null; staff_title: string | null; biography: string | null; research_specialties: string | null; profile_photo_url: string | null };
+type Props = { searchParams: Promise<{ error?: string; saved?: string; profileSaved?: string }> };
 
 const messages: Record<string,string> = {
   invalid: "Enter a valid UID, role, status, and names within the allowed lengths.",
@@ -13,6 +13,8 @@ const messages: Record<string,string> = {
   forbidden: "Only active Owners may modify staff accounts.",
   "no-user": "That UID does not exist in Supabase Authentication.",
   save: "The change could not be saved. Check the UID and database migration.",
+  "invalid-profile": "Check profile field lengths and use a valid HTTPS photo URL.",
+  "profile-save": "Could not update staff profile. Confirm migration 026 is installed.",
 };
 
 async function TeamContent({ searchParams }: Props) {
@@ -26,7 +28,7 @@ async function TeamContent({ searchParams }: Props) {
     redirect("/staff/dashboard");
   }
   const { data, error: listError } = await supabase.from("staff_members")
-    .select("user_id,role,status,created_at,display_name,greeting_name").order("created_at", { ascending: true });
+    .select("user_id,role,status,created_at,display_name,greeting_name,staff_title,biography,research_specialties,profile_photo_url").order("created_at", { ascending: true });
   const rows = (data ?? []) as Staff[];
   const params = await searchParams;
   const ownerCount = rows.filter(row => row.role === "owner" && row.status === "active").length;
@@ -39,6 +41,7 @@ async function TeamContent({ searchParams }: Props) {
       <p className="mt-3 max-w-2xl text-sm text-slate-200">Manage names, greetings, roles, and account access. Changes take effect in your existing permission checks.</p>
     </div></div>
     <div className="mx-auto max-w-6xl space-y-8 px-5 py-8 sm:px-8">
+      {params.profileSaved === "1" && <p role="status" className="rounded-lg border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-900">Staff profile updated.</p>}
       {params.saved === "1" && <p role="status" className="rounded-lg border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-900">Staff access updated.</p>}
       {params.error && <p role="alert" className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-900">{messages[params.error] ?? messages.save}</p>}
       <section className="grid gap-4 sm:grid-cols-3">
@@ -70,6 +73,18 @@ async function TeamContent({ searchParams }: Props) {
             <label className="text-sm font-semibold">Role<select name="role" defaultValue={member.role} className="mt-1 block w-full rounded-lg border border-slate-300 px-3 py-2"><option value="owner">Owner</option><option value="admin">Administrator</option><option value="editor">Editor</option></select></label>
             <label className="text-sm font-semibold">Status<select name="status" defaultValue={member.status} className="mt-1 block w-full rounded-lg border border-slate-300 px-3 py-2"><option value="active">Active</option><option value="inactive">Inactive</option></select></label>
             <button type="submit" className="rounded-lg border border-[#002144] px-4 py-2 text-sm font-bold hover:bg-slate-100">Update</button>
+          </form>)}
+          {rows.map(member => <form action={saveStaffBio} key={`bio-${member.user_id}`} className="rounded-xl border border-[#861F41]/20 bg-[#fcf9fa] p-4">
+            <input name="user_id" type="hidden" value={member.user_id}/>
+            <h3 className="text-base font-bold">Profile details · {member.display_name || member.greeting_name || "Unnamed staff member"}</h3>
+            <p className="mt-1 text-xs text-slate-600">Staff-only fields. Save these separately from role and name changes.</p>
+            <div className="mt-4 grid gap-3 sm:grid-cols-2">
+              <label className="text-sm font-semibold">Staff title<input name="staff_title" maxLength={100} defaultValue={member.staff_title ?? ""} placeholder="Founder & Owner" className="mt-1 block w-full rounded-lg border border-slate-300 px-3 py-2"/></label>
+              <label className="text-sm font-semibold">Research specialties<input name="research_specialties" maxLength={300} defaultValue={member.research_specialties ?? ""} placeholder="KMEA history, scoring research" className="mt-1 block w-full rounded-lg border border-slate-300 px-3 py-2"/></label>
+              <label className="text-sm font-semibold sm:col-span-2">Profile photo HTTPS URL<input name="profile_photo_url" type="url" maxLength={500} defaultValue={member.profile_photo_url ?? ""} placeholder="https://example.com/photo.jpg" className="mt-1 block w-full rounded-lg border border-slate-300 px-3 py-2"/></label>
+              <label className="text-sm font-semibold sm:col-span-2">Biography<textarea name="biography" maxLength={1000} rows={4} defaultValue={member.biography ?? ""} placeholder="Research interests, background, and contributions" className="mt-1 block w-full rounded-lg border border-slate-300 px-3 py-2"/></label>
+            </div>
+            <button type="submit" className="mt-4 rounded-lg bg-[#861F41] px-5 py-2.5 text-sm font-bold text-white hover:bg-[#6d1936]">Save profile details</button>
           </form>)}
           {!listError && rows.length===0 && <p className="text-sm text-slate-600">No staff accounts were found.</p>}
         </div>

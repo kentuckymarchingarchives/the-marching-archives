@@ -3,7 +3,7 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 
-type Member = { user_id: string; display_name: string | null; greeting_name: string | null; role: string; status: string };
+type Member = { user_id: string; display_name: string | null; greeting_name: string | null; role: string; status: string; staff_title: string | null; biography: string | null; research_specialties: string | null; profile_photo_url: string | null };
 type Task = { id: string; title: string; status: string; priority: string; due_date: string | null; updated_at: string; completed_at: string | null };
 const roleTitle = (role: string) => role === "owner" ? "Owner" : role === "admin" ? "Administrator" : "Editor";
 const nameOf = (s: Member) => s.display_name?.trim() || s.greeting_name?.trim() || "Staff member";
@@ -37,9 +37,17 @@ async function ProfileContent({ params }: Props) {
       <Link href="/staff/profiles" className="text-sm text-slate-200 hover:text-white">← Staff directory</Link>
       <p className="mt-7 text-xs font-bold uppercase tracking-widest text-[#efbbce]">Archive team profile</p>
       <h1 className="mt-2 text-3xl font-extrabold">{nameOf(member)}{id === uid ? " · Your profile" : ""}</h1>
-      <p className="mt-2 text-sm text-slate-200">{roleTitle(member.role)} · Active staff</p>
+      <p className="mt-2 text-base font-semibold text-[#efbbce]">{member.staff_title || roleTitle(member.role)}</p>
+      <p className="mt-1 text-sm text-slate-200">{roleTitle(member.role)} · Active staff</p>
     </div></header>
     <div className="mx-auto max-w-5xl space-y-7 px-5 py-8 sm:px-8">
+      <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+        <div className="flex items-start gap-4">
+          {member.profile_photo_url ? <img src={member.profile_photo_url} alt={`${nameOf(member)} profile`} referrerPolicy="no-referrer" className="h-20 w-20 rounded-full border border-slate-200 object-cover"/> : <div aria-hidden="true" className="flex h-20 w-20 shrink-0 items-center justify-center rounded-full bg-[#002144] text-xl font-bold text-white">{nameOf(member).slice(0,2).toUpperCase()}</div>}
+          <div><h2 className="text-lg font-extrabold">About {nameOf(member)}</h2><p className="mt-2 whitespace-pre-wrap text-sm text-slate-700">{member.biography || "No biography added yet."}</p></div>
+        </div>
+        {member.research_specialties && <div className="mt-5 border-t border-slate-100 pt-4"><h3 className="text-sm font-extrabold">Research specialties</h3><p className="mt-2 text-sm text-slate-700">{member.research_specialties}</p></div>}
+      </section>
       <section aria-label="Research contributions" className="grid gap-4 sm:grid-cols-3">
         {[{label:"Completed assignments",value:completed.length},{label:"Active assignments",value:ongoing.length},{label:"Total assigned",value:tasks.length}].map(x => <div key={x.label} className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm"><p className="text-sm text-slate-600">{x.label}</p><p className="mt-2 text-3xl font-extrabold tabular-nums">{tasksError ? "—" : x.value}</p></div>)}
       </section>

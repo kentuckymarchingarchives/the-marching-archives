@@ -40,3 +40,32 @@ export async function saveStaffMember(formData: FormData) {
   revalidatePath("/staff/dashboard");
   redirect("/staff/team?saved=1");
 }
+
+
+export async function saveStaffBio(formData: FormData) {
+  const userId = String(formData.get("user_id") ?? "").trim();
+  const staffTitle = String(formData.get("staff_title") ?? "").trim();
+  const biography = String(formData.get("biography") ?? "").trim();
+  const specialties = String(formData.get("research_specialties") ?? "").trim();
+  const photo = String(formData.get("profile_photo_url") ?? "").trim();
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(userId) ||
+      staffTitle.length > 100 || biography.length > 1000 || specialties.length > 300 ||
+      photo.length > 500 || (photo !== "" && !/^https:\/\/\S+$/.test(photo))) {
+    redirect("/staff/team?error=invalid-profile");
+  }
+  const supabase = await createClient();
+  const { data: auth, error: authError } = await supabase.auth.getClaims();
+  if (authError || !auth?.claims?.sub) redirect("/staff/login");
+  const { error } = await supabase.rpc("tma_update_staff_bio", {
+    p_user_id: userId,
+    p_staff_title: staffTitle,
+    p_biography: biography,
+    p_research_specialties: specialties,
+    p_profile_photo_url: photo,
+  });
+  if (error) redirect(`/staff/team?error=${error.code === "42501" ? "forbidden" : "profile-save"}`);
+  revalidatePath("/staff/team");
+  revalidatePath("/staff/profiles");
+  revalidatePath(`/staff/profiles/${userId}`);
+  redirect("/staff/team?profileSaved=1");
+}
