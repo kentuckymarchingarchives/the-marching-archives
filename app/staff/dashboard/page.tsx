@@ -20,6 +20,7 @@ const reviewTools: Shortcut[] = [
   { title: "Corrections", detail: "Review community-submitted corrections", href: "/staff/corrections", symbol: "CR" },
   { title: "Notifications", detail: "Corrections, sources, and unpublished records", href: "/staff/notifications", symbol: "NT" },
   { title: "Research Assignments", detail: "Team tasks, priority, and progress", href: "/staff/research", symbol: "RA" },
+  { title: "Staff Profiles", detail: "Team directory and documented research contributions", href: "/staff/profiles", symbol: "SP" },
   { title: "Duplicate Detection", detail: "Review potential duplicate historical records", href: "/staff/duplicates", symbol: "DD" },
 ];
 
