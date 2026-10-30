@@ -70,17 +70,17 @@ async function ChampionshipContent({ searchParams }: Props) {
     .filter(({ finals }) => !classFilter || finals.some(r => (r.class_scope ?? "").toLowerCase().includes(classFilter.toLowerCase())));
   const pages = Math.ceil(count / PAGE_SIZE);
   return <>
-    <section className="bg-[#002144] px-5 py-16 text-white sm:px-8">
+    <section className="relative overflow-hidden bg-[#002144] px-5 py-20 text-white sm:px-8">
       <div className="mx-auto max-w-7xl">
         <div className="text-sm text-slate-300"><Link href="/" className="hover:underline">Home</Link> / Championship Records</div>
         <p className="mt-7 text-xs font-bold uppercase tracking-[0.22em] text-[#e6a9bc]">Historical archive</p>
-        <h1 className="mt-3 text-4xl font-extrabold tracking-tight sm:text-5xl">Championship Records</h1>
+        <p className="mt-7 text-xs font-extrabold uppercase tracking-[.23em] text-[#e8afc2]">Championship archive</p><h1 className="mt-3 max-w-3xl text-4xl font-extrabold tracking-tight sm:text-6xl">Where history <span className="text-[#e8afc2]">was made.</span></h1>
         <p className="mt-5 max-w-3xl leading-8 text-slate-200">Browse published championship events and open their recorded finals results by year, organization, and classification.</p>
         <Link href="/records" className="mt-5 inline-flex rounded-lg border border-white/30 px-4 py-2 text-sm font-bold text-white hover:bg-white/10">Explore championship milestones →</Link>
       </div>
     </section>
     <main className="mx-auto max-w-7xl px-5 pb-20 sm:px-8">
-      <form action="/championships" method="get" className="relative -mt-7 grid gap-4 rounded-2xl border border-slate-200 bg-white p-6 shadow-lg sm:grid-cols-3">
+      <form action="/championships" method="get" className="relative -mt-8 grid gap-4 rounded-3xl border border-slate-200 bg-white p-6 shadow-lg sm:grid-cols-3">
         <label className="text-sm font-bold text-[#002144]">Season
           <input className={field} name="year" type="number" min="1800" max="2200" defaultValue={year} placeholder="All years" />
         </label>
@@ -101,7 +101,7 @@ async function ChampionshipContent({ searchParams }: Props) {
       </div>
       {response.error || roundsError ? <div role="alert" className="mt-6 rounded-xl border border-red-200 bg-red-50 p-6 text-red-800">Unable to load complete championship records. Please try again.</div> :
         visible.length ? <div className="mt-6 grid gap-5 lg:grid-cols-2">
-          {visible.map(({ event, finals }) => <article key={event.id} className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+          {visible.map(({ event, finals }) => <article key={event.id} className="rounded-3xl border border-slate-200 bg-white p-7 shadow-sm transition-shadow hover:shadow-md">
             <div className="flex flex-wrap gap-2 text-xs font-bold uppercase tracking-wide"><span className="rounded-full bg-[#002144]/10 px-3 py-1 text-[#002144]">{event.organization_code}</span><span className="rounded-full bg-[#861F41]/10 px-3 py-1 text-[#861F41]">{event.season_year}</span><span className="rounded-full bg-slate-100 px-3 py-1 text-slate-600">{nice(event.competition_type)}</span></div>
             <h3 className="mt-5 text-xl font-extrabold text-[#002144]">{event.name}</h3>
             <p className="mt-2 text-sm text-slate-600">{dateLabel(event.competition_date)}{event.city ? ` · ${event.city}` : ""}{event.state ? `, ${event.state}` : ""}</p>
@@ -117,7 +117,7 @@ async function ChampionshipContent({ searchParams }: Props) {
         <span className="text-slate-500">Page {page} of {pages}</span>
         {page < pages && <Link href={hrefFor({year,organization,classFilter},page+1)} className="rounded-lg border border-slate-200 bg-white px-5 py-3 text-[#002144]">Next →</Link>}
       </nav>}
-      <aside className="mt-10 rounded-2xl border border-slate-200 bg-slate-50 p-6 text-sm leading-7 text-slate-600"><strong className="text-[#002144]">How to interpret these records:</strong> Championship events are identified by their recorded competition type. Finals links lead to published round results. A first-place placement is not automatically an independently verified official championship title. Class filtering applies to finals rounds displayed on each page of events; counts and pagination refer to events before that filter.</aside>
+      <aside className="mt-10 rounded-2xl border-l-4 border-[#861F41] bg-white p-6 text-sm leading-7 text-slate-600"><strong className="text-[#002144]">How to interpret these records:</strong> Championship events are identified by their recorded competition type. Finals links lead to published round results. A first-place placement is not automatically an independently verified official championship title. Class filtering applies to finals rounds displayed on each page of events; counts and pagination refer to events before that filter.</aside>
     </main>
   </>;
 }

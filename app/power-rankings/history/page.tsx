@@ -73,13 +73,13 @@ async function HistoryContent({ searchParams }: Props) {
     }
   }
   return <main className="min-h-screen bg-[#f6f7f9] text-[#002144]">
-    <section className="bg-[#002144] px-6 py-14 text-white"><div className="mx-auto max-w-5xl">
+    <section className="relative overflow-hidden bg-[#002144] px-6 py-20 text-white"><div className="mx-auto max-w-5xl">
       <Link href="/power-rankings" className="text-sm font-semibold text-pink-200 hover:underline">← Power Rankings</Link>
-      <h1 className="mt-4 text-4xl font-extrabold">Power Rankings History</h1>
+      <p className="mt-7 text-xs font-extrabold uppercase tracking-[.23em] text-[#e8afc2]">Edition-by-edition movement</p><h1 className="mt-3 text-4xl font-extrabold tracking-tight sm:text-6xl">Power Rankings <span className="text-[#e8afc2]">History.</span></h1>
       <p className="mt-3 max-w-3xl text-slate-200">Follow an ensemble through published ranking editions. Movement is calculated only between comparable, documented numbered positions.</p>
     </div></section>
     <div className="mx-auto max-w-5xl space-y-6 px-6 py-10">
-      <form action="/power-rankings/history" className="grid gap-3 rounded-2xl border bg-white p-5 sm:grid-cols-2 lg:grid-cols-4">
+      <form action="/power-rankings/history" className="grid gap-4 rounded-3xl border border-slate-200 bg-white p-6 shadow-sm sm:grid-cols-2 lg:grid-cols-4">
         <label className="grid gap-1 text-sm font-semibold">Organization<select name="organization" defaultValue={organization} className="rounded-lg border p-3"><option value="KMEA">KMEA</option><option value="BOA">BOA</option></select></label>
         <label className="grid gap-1 text-sm font-semibold">Season<input name="year" type="number" min="1900" max="2100" defaultValue={year} className="rounded-lg border p-3" required/></label>
         <label className="grid gap-1 text-sm font-semibold">Ensemble slug<input name="band" defaultValue={bandSlug} placeholder="From band profile URL" className="rounded-lg border p-3" required/></label>
@@ -90,10 +90,10 @@ async function HistoryContent({ searchParams }: Props) {
       {errors.map(e=><p key={e} role="alert" className="rounded-xl border border-red-200 bg-red-50 p-4 text-red-800">{e}</p>)}
       {truncated&&<p role="alert" className="rounded-xl bg-amber-50 p-4 text-amber-900">More than 200 editions were found. History is withheld to avoid an incomplete comparison.</p>}
       {bandSlug&&!band&&!bandError&&<p className="rounded-xl border bg-white p-5">No band found with that URL slug. Open a band profile and use its final URL segment.</p>}
-      {band&&!errors.length&&!truncated&&<section className="rounded-2xl border bg-white p-6">
+      {band&&!errors.length&&!truncated&&<section className="rounded-3xl border border-slate-200 bg-white p-7 shadow-sm">
         <div className="flex flex-wrap items-start justify-between gap-4"><div><p className="text-xs font-bold uppercase tracking-widest text-[#861F41]">{organization} · {year} · {view==="class"?`Class ${classification}`:"Overall"}</p><h2 className="mt-2 text-2xl font-extrabold">{band.name}</h2><p className="mt-1 text-sm text-slate-500">{editions.length} published edition{editions.length===1?"":"s"} documented</p></div><Link href={`/bands/${band.slug}`} className="text-sm font-semibold text-[#861F41] hover:underline">Band profile →</Link></div>
         <PowerRankingTrendChart editions={rows.map(r => ({ id: r.edition.id, label: r.edition.title, rank: r.rank, description: r.description }))} />
-        <div className="mt-6 overflow-x-auto"><table className="w-full min-w-140 text-left text-sm"><thead><tr className="border-b text-slate-500"><th className="py-3 pr-3">Edition</th><th className="pr-3">Publication date</th><th className="pr-3">Recorded position / group</th><th>Change</th></tr></thead><tbody>{rows.map(r=><tr key={r.edition.id} className="border-b last:border-0"><td className="py-4 pr-3 font-semibold"><Link className="hover:underline" href={`/power-rankings?organization=${organization}&year=${year}&edition=${r.edition.id}`}>{r.edition.title}</Link></td><td className="pr-3 text-slate-500"><EditionDate value={r.edition.published_on}/></td><td className="pr-3">{r.description}</td><td className={r.movement.startsWith("↑")?"font-semibold text-emerald-700":r.movement.startsWith("↓")?"font-semibold text-red-700":"text-slate-500"}>{r.movement}</td></tr>)}</tbody></table></div>
+        <div className="mt-6 overflow-x-auto"><table className="w-full min-w-140 text-left text-sm"><thead><tr className="border-b bg-[#edf2f7] text-[#002144]"><th className="py-3 pr-3">Edition</th><th className="pr-3">Publication date</th><th className="pr-3">Recorded position / group</th><th>Change</th></tr></thead><tbody>{rows.map(r=><tr key={r.edition.id} className="border-b border-slate-100 transition-colors hover:bg-[#f8edf1] last:border-0"><td className="py-4 pr-3 font-semibold"><Link className="hover:underline" href={`/power-rankings?organization=${organization}&year=${year}&edition=${r.edition.id}`}>{r.edition.title}</Link></td><td className="pr-3 text-slate-500"><EditionDate value={r.edition.published_on}/></td><td className="pr-3">{r.description}</td><td className={r.movement.startsWith("↑")?"font-semibold text-emerald-700":r.movement.startsWith("↓")?"font-semibold text-red-700":"text-slate-500"}>{r.movement}</td></tr>)}</tbody></table></div>
         {!rows.length&&<p className="mt-5 text-slate-500">No published ranking editions were found for these filters.</p>}
         <p className="mt-5 text-xs leading-6 text-slate-500">Movement compares each edition only with the immediately preceding published edition of the same season and ranking type, when both contain numbered positions. Unlisted bands and unnumbered additional groups are never assigned an inferred rank. Editions without publication dates follow record creation order as a fallback.</p>
       </section>}

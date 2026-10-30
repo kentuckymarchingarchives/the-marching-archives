@@ -3,7 +3,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 
-type Member = { user_id: string; display_name: string | null; greeting_name: string | null; role: string; status: string };
+type Member = { user_id: string; display_name: string | null; greeting_name: string | null; role: string; status: string; staff_title: string | null; biography: string | null; research_specialties: string | null; profile_photo_url: string | null };
 type Assignment = { assigned_to: string | null; status: string };
 const roleTitle = (role: string) => role === "owner" ? "Owner" : role === "admin" ? "Administrator" : "Editor";
 const nameOf = (s: Member) => s.display_name?.trim() || s.greeting_name?.trim() || "Staff member";
@@ -35,7 +35,8 @@ async function DirectoryContent() {
           const mine = tasks.filter(t => t.assigned_to === s.user_id);
           const completed = mine.filter(t => t.status === "completed").length;
           return <Link key={s.user_id} href={`/staff/profiles/${s.user_id}`} className="group rounded-2xl border border-slate-200 bg-white p-6 shadow-sm transition hover:border-[#861F41]/50 hover:shadow-md">
-            <div className="flex items-center gap-3"><span aria-hidden="true" className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-[#002144] text-sm font-extrabold text-white">{(s.greeting_name || nameOf(s)).trim().slice(0,2).toUpperCase()}</span><div className="min-w-0"><h2 className="truncate text-lg font-extrabold group-hover:text-[#861F41]">{nameOf(s)}{s.user_id === uid ? " (You)" : ""}</h2><p className="text-xs font-semibold text-[#861F41]">{roleTitle(s.role)}</p></div></div>
+            <div className="flex items-center gap-3">{s.profile_photo_url ? <img src={s.profile_photo_url} alt="" referrerPolicy="no-referrer" className="h-12 w-12 shrink-0 rounded-full object-cover"/> : <span aria-hidden="true" className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-[#002144] text-sm font-extrabold text-white">{(s.greeting_name || nameOf(s)).trim().slice(0,2).toUpperCase()}</span>}<div className="min-w-0"><h2 className="truncate text-lg font-extrabold group-hover:text-[#861F41]">{nameOf(s)}{s.user_id === uid ? " (You)" : ""}</h2><p className="text-xs font-semibold text-[#861F41]">{s.staff_title || roleTitle(s.role)}</p><p className="text-xs text-slate-500">{roleTitle(s.role)}</p></div></div>
+            {s.research_specialties && <p className="mt-3 line-clamp-2 text-sm text-slate-600">{s.research_specialties}</p>}
             <div className="mt-5 flex gap-5 border-t border-slate-100 pt-4 text-sm"><div><p className="text-2xl font-extrabold">{assignmentsResult.error ? "—" : completed}</p><p className="text-xs text-slate-600">Completed tasks</p></div><div><p className="text-2xl font-extrabold">{assignmentsResult.error ? "—" : mine.filter(t => t.status !== "completed").length}</p><p className="text-xs text-slate-600">Active tasks</p></div></div>
           </Link>;
         })}</div>}

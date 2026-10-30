@@ -123,16 +123,16 @@ async function LeaderboardContent({ searchParams }: Props) {
 
   return (
     <>
-      <div className="bg-[#002144] text-white">
+      <div className="relative overflow-hidden bg-[#002144] text-white">
         <div className="mx-auto max-w-7xl px-6 py-14 sm:px-8">
           <nav aria-label="Breadcrumb" className="mb-5 text-sm text-slate-300"><Link href="/" className="hover:text-white">Home</Link> <span aria-hidden="true">/</span> Leaderboards</nav>
           <p className="text-xs font-bold uppercase tracking-[0.2em] text-[#e6a9bc]">Archive analytics</p>
-          <h1 className="mt-3 text-4xl font-extrabold tracking-tight sm:text-5xl">Ensemble leaderboards</h1>
+          <h1 className="mt-3 max-w-3xl text-4xl font-extrabold tracking-tight sm:text-6xl">The numbers behind <span className="text-[#e8afc2]">the performances.</span></h1>
           <p className="mt-5 max-w-2xl leading-7 text-slate-200">Explore results from published competitions, organized by season and governing organization.</p>
         </div>
       </div>
-      <main className="mx-auto max-w-7xl px-6 py-10 sm:px-8">
-        <form method="get" action="/leaderboards" className="grid gap-4 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm sm:grid-cols-2 lg:grid-cols-4">
+      <main className="mx-auto max-w-7xl space-y-7 px-6 py-10 sm:px-8">
+        <form method="get" action="/leaderboards" className="grid gap-4 rounded-3xl border border-slate-200 bg-white p-6 shadow-sm sm:grid-cols-2 lg:grid-cols-4">
           <label className="text-sm font-bold text-[#002144]">Season
             <input type="number" name="year" min="1900" max="2200" defaultValue={year} className="mt-2 block w-full rounded-lg border border-slate-300 p-3" required />
           </label>
@@ -158,11 +158,11 @@ async function LeaderboardContent({ searchParams }: Props) {
           </div>
         ) : standings.length ? (
           <div className="mt-5 overflow-x-auto rounded-2xl border border-slate-200 bg-white shadow-sm">
-            <table className="w-full min-w-170 text-left text-sm">
-              <thead className="bg-slate-100 text-xs uppercase tracking-wider text-slate-600"><tr><th className="px-5 py-4">Rank</th><th className="px-5 py-4">Ensemble</th><th className="px-4 py-4 text-right">Appearances</th><th className="px-4 py-4 text-right">Overall wins</th><th className="px-4 py-4 text-right">Class wins</th><th className="px-5 py-4 text-right">Podiums</th></tr></thead>
+            <table className="w-full min-w-[680px] text-left text-sm">
+              <thead className="bg-[#edf2f7] text-xs uppercase tracking-wider text-[#002144]"><tr><th className="px-5 py-4">Rank</th><th className="px-5 py-4">Ensemble</th><th className="px-4 py-4 text-right">Appearances</th><th className="px-4 py-4 text-right">Overall wins</th><th className="px-4 py-4 text-right">Class wins</th><th className="px-5 py-4 text-right">Podiums</th></tr></thead>
               <tbody className="divide-y divide-slate-100">
                 {standings.map((s, index) => (
-                  <tr key={s.id} className="hover:bg-slate-50">
+                  <tr key={s.id} className="border-b border-slate-100 transition-colors hover:bg-[#f8edf1]">
                     <td className="px-5 py-4 font-extrabold tabular-nums text-[#861F41]">{index + 1}</td>
                     <td className="px-5 py-4"><Link href={`/bands/${s.slug}`} className="font-bold text-[#002144] hover:text-[#861F41] hover:underline">{s.name}</Link></td>
                     <td className="px-4 py-4 text-right tabular-nums">{s.appearances}</td>
@@ -177,7 +177,7 @@ async function LeaderboardContent({ searchParams }: Props) {
         ) : (
           <div className="mt-5 rounded-2xl border border-slate-200 bg-white p-10 text-center"><h3 className="font-bold text-[#002144]">No published results for this selection</h3><p className="mt-2 text-sm text-slate-600">Try another season or organization as the archive grows.</p></div>
         )}
-        <p className="mt-6 max-w-4xl text-sm leading-7 text-slate-600">Methodology: one appearance per recorded ensemble entry in a competition round. Overall wins and podiums use overall placement; class wins use class placement. Multiple rounds within one event are counted separately. Only published, non-archived competitions and rounds are considered. These are documented placements, not independently verified championship titles. Rankings do not compare score scales across organizations.</p>
+        <p className="mt-6 max-w-4xl border-l-4 border-[#861F41] bg-white px-5 py-4 text-sm leading-7 text-slate-600">Methodology: one appearance per recorded ensemble entry in a competition round. Overall wins and podiums use overall placement; class wins use class placement. Multiple rounds within one event are counted separately. Only published, non-archived competitions and rounds are considered. These are documented placements, not independently verified championship titles. Rankings do not compare score scales across organizations.</p>
       </main>
     </>
   );

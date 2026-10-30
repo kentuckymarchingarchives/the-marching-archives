@@ -386,7 +386,7 @@ async function StatisticsContent({ params }: Props) {
   const canonicalId = band.slug || band.id;
 
   return (
-    <div className="mx-auto max-w-7xl space-y-9 px-5 py-8 md:px-8 md:py-12">
+    <div className="mx-auto max-w-7xl space-y-10 px-5 py-10 md:px-8 md:py-14">
       <nav aria-label="Breadcrumb" className="flex flex-wrap gap-2 text-sm text-slate-600">
         <Link href="/bands" className="hover:text-[#861F41] hover:underline">Bands & Corps</Link>
         <span aria-hidden="true">/</span>
@@ -395,9 +395,9 @@ async function StatisticsContent({ params }: Props) {
         <span aria-current="page" className="font-semibold text-[#002144]">Statistics</span>
       </nav>
 
-      <header className="overflow-hidden rounded-3xl bg-[#002144] px-7 py-9 text-white md:px-10 md:py-12">
+      <header className="relative overflow-hidden rounded-3xl bg-[#002144] px-7 py-12 text-white shadow-lg md:px-12 md:py-16">
         <p className="text-xs font-bold uppercase tracking-[0.2em] text-[#edb0c5]">Historical performance</p>
-        <h1 className="mt-3 text-3xl font-extrabold tracking-tight md:text-5xl">{band.name}</h1>
+        <h1 className="mt-3 text-4xl font-extrabold tracking-tight md:text-6xl">{band.name}</h1>
         <p className="mt-3 max-w-2xl text-sm leading-7 text-slate-200 md:text-base">
           Explore recorded placements, scores, and season-by-season results from published competitions.
         </p>

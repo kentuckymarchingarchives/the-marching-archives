@@ -12,7 +12,6 @@ import {
 } from "@/lib/public-competition-routes";
 
 import BandLogo from "@/components/BandLogo";
-import RecordCitation from "@/components/RecordCitation";
 
 export const instant = false;
 
@@ -54,18 +53,17 @@ type CaptionScore = {
 };
 
 function scoreText(
-  value: number | string | null | undefined
+  value: number | string | null | undefined,
+  minimumDecimals = 3
 ): string {
   if (value === null || value === undefined) return "—";
-
-  const valueNumber = Number(value);
-
-  if (!Number.isFinite(valueNumber)) return "—";
-
-  return valueNumber
-    .toFixed(4)
-    .replace(/0+$/, "")
-    .replace(/\.$/, "");
+  const number = Number(value);
+  if (!Number.isFinite(number)) return "—";
+  // Totals use at least three decimals; captions can use two while
+  // preserving additional recorded precision (up to four decimals).
+  return number.toFixed(4).replace(/0+$/, "").replace(/\.$/, "")
+    .replace(/\.(\d+)$/, (_, decimals: string) =>
+      "." + decimals.padEnd(minimumDecimals, "0"));
 }
 
 function rankText(value: number | null, tied: boolean): string {
@@ -134,7 +132,7 @@ function ResultsTable({
 }) {
   return (
     <div className="overflow-x-auto rounded-2xl border border-slate-200 bg-white shadow-sm ring-1 ring-slate-100">
-      <table className="w-full 180 text-left text-sm">
+      <table className="w-full min-w-180 text-left text-sm">
         <thead className="bg-slate-100 text-[#002144]">
           <tr>
             <th scope="col" className="px-5 py-4">
@@ -458,7 +456,7 @@ async function RoundContent({ params }: Props) {
           <p className="mt-5 text-sm font-semibold text-slate-200">
             {competition.name}
           </p>
-          <h1 className="mt-2 max-w-4xl text-3xl font-extrabold tracking-tight sm:text-5xl">
+          <h1 className="mt-2 max-w-4xl text-3xl font-black tracking-tight sm:text-5xl">
             {round.name} <span className="text-[#efb1c5]">Results</span>
           </h1>
           <div className="mt-6 flex flex-wrap gap-2 text-sm text-slate-200">
@@ -522,21 +520,13 @@ async function RoundContent({ params }: Props) {
         <a href="#details" className="rounded-xl border border-slate-200 bg-slate-50 px-5 py-3 text-sm font-bold text-[#002144] transition hover:bg-slate-100">
           Caption Breakdowns
         </a>
-        {!incomplete && (
-          <a
-            href={`${canonical}/export`}
-            className="rounded-xl border border-[#861F41]/30 bg-white px-5 py-3 text-sm font-bold text-[#861F41] hover:bg-rose-50"
-          >
-            Download CSV
-          </a>
-        )}
         <a href="#sources" className="rounded-xl border border-slate-200 bg-white px-5 py-3 text-sm font-bold text-slate-600 transition hover:bg-slate-50">
           Sources
         </a>
       </nav>
 
       <section id="overall" className="scroll-mt-28 space-y-5">
-        <h2 className="text-2xl font-extrabold tracking-tight text-[#002144] sm:text-3xl">
+        <h2 className="text-2xl font-black tracking-tight text-[#002144] sm:text-3xl">
           Overall Results
         </h2>
 
@@ -553,7 +543,7 @@ async function RoundContent({ params }: Props) {
 
       {classes.length > 0 && (
         <section id="classes" className="scroll-mt-28 space-y-7">
-          <h2 className="text-2xl font-extrabold tracking-tight text-[#002144] sm:text-3xl">
+          <h2 className="text-2xl font-black tracking-tight text-[#002144] sm:text-3xl">
             Class Results
           </h2>
 
@@ -593,7 +583,7 @@ async function RoundContent({ params }: Props) {
       )}
 
       <section id="details" className="scroll-mt-28 space-y-5">
-        <h2 className="text-2xl font-extrabold tracking-tight text-[#002144] sm:text-3xl">
+        <h2 className="text-2xl font-black tracking-tight text-[#002144] sm:text-3xl">
           Individual Score Breakdowns
         </h2>
 
@@ -711,7 +701,7 @@ async function RoundContent({ params }: Props) {
                                 )}
                               </td>
                               <td className="px-4 py-3 text-right tabular-nums text-slate-500">
-                                {scoreText(caption.max_score)}
+                                {scoreText(caption.max_score, 2)}
                               </td>
                             </tr>
                           ))}
@@ -745,14 +735,7 @@ async function RoundContent({ params }: Props) {
         )}
       </section>
 
-      <RecordCitation
-        competition={competition.name}
-        season={competition.season_year}
-        round={round.name}
-        path={canonical}
-      />
-
-      <section id="sources" className="scroll-mt-28 rounded-2xl border border-slate-200 bg-white p-7">
+      <section id="sources" className="scroll-mt-28 rounded-3xl border border-slate-200 bg-white p-7 shadow-sm">
         <h2 className="text-2xl font-bold text-[#002144]">
           Sources &amp; Accuracy
         </h2>
@@ -788,7 +771,7 @@ async function RoundContent({ params }: Props) {
 
 export default function PublicRoundResultsPage(props: Props) {
   return (
-    <main className="min-h-screen bg-[#F4F6F9]">
+    <main className="min-h-screen bg-[#f6f7f9]">
       <Suspense
         fallback={
           <div
