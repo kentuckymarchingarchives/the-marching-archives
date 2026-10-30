@@ -66,7 +66,16 @@ export default function SiteHeader() {
             </Link>
           ))}
           {navigationGroups.map((group) => (
-            <div key={group.label} className="relative">
+            <div key={group.label}
+              className="relative"
+              onMouseEnter={() => setOpenGroup(group.label)}
+              onMouseLeave={() => setOpenGroup((current) => current === group.label ? null : current)}
+              onFocus={() => setOpenGroup(group.label)}
+              onBlur={(event) => {
+                if (!event.currentTarget.contains(event.relatedTarget)) {
+                  setOpenGroup((current) => current === group.label ? null : current);
+                }
+              }}>
               <button
                 type="button"
                 className={`${baseLink} flex items-center gap-1.5`}
@@ -80,16 +89,18 @@ export default function SiteHeader() {
                 </svg>
               </button>
               {openGroup === group.label && (
-                <div id={`nav-${group.label.toLowerCase()}`} className="absolute right-0 top-full mt-3 w-[306px] rounded-xl border border-[#DFE5EC] bg-white p-2 shadow-[0_18px_46px_rgba(0,33,68,.16)]">
-                  <div className="px-3 pb-2 pt-2 text-[10px] font-extrabold uppercase tracking-[.18em] text-[#861F41]">
-                    {group.label}
+                <div id={`nav-${group.label.toLowerCase()}`} className="absolute right-0 top-full z-50 w-[306px] pt-3">
+                  <div className="rounded-xl border border-[#DFE5EC] bg-white p-2 shadow-[0_18px_46px_rgba(0,33,68,.16)]">
+                    <div className="px-3 pb-2 pt-2 text-[10px] font-extrabold uppercase tracking-[.18em] text-[#861F41]">
+                      {group.label}
+                    </div>
+                    {group.links.map((link) => (
+                      <Link key={link.href} href={link.href} onClick={closeAll} className="block rounded-lg px-3 py-2.5 transition-colors hover:bg-[#F2F5F8] focus-visible:outline-2 focus-visible:outline-[#861F41]">
+                        <span className="block text-sm font-bold text-[#002144]">{link.label}</span>
+                        <span className="mt-0.5 block text-xs text-[#667789]">{link.description}</span>
+                      </Link>
+                    ))}
                   </div>
-                  {group.links.map((link) => (
-                    <Link key={link.href} href={link.href} onClick={closeAll} className="block rounded-lg px-3 py-2.5 transition-colors hover:bg-[#F2F5F8] focus-visible:outline-2 focus-visible:outline-[#861F41]">
-                      <span className="block text-sm font-bold text-[#002144]">{link.label}</span>
-                      <span className="mt-0.5 block text-xs text-[#667789]">{link.description}</span>
-                    </Link>
-                  ))}
                 </div>
               )}
             </div>
