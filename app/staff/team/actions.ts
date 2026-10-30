@@ -69,3 +69,23 @@ export async function saveStaffBio(formData: FormData) {
   revalidatePath(`/staff/profiles/${userId}`);
   redirect("/staff/team?profileSaved=1");
 }
+
+
+export async function setPublicTeamVisibility(formData: FormData) {
+  const userId = String(formData.get("user_id") ?? "").trim();
+  const visible = formData.get("show_on_public_team") === "on";
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(userId)) {
+    redirect("/staff/team?error=invalid");
+  }
+  const supabase = await createClient();
+  const { data: auth, error: authError } = await supabase.auth.getClaims();
+  if (authError || !auth?.claims?.sub) redirect("/staff/login");
+  const { error } = await supabase.rpc("tma_set_public_team_visibility", {
+    p_user_id: userId,
+    p_visible: visible,
+  });
+  if (error) redirect(`/staff/team?error=${error.code === "42501" ? "forbidden" : "public-team"}`);
+  revalidatePath("/staff/team");
+  revalidatePath("/team");
+  redirect("/staff/team?visibilitySaved=1");
+}

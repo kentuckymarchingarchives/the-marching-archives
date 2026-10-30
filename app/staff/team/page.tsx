@@ -2,10 +2,10 @@ import { Suspense } from "react";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { saveStaffMember, saveStaffBio } from "./actions";
+import { saveStaffMember, saveStaffBio, setPublicTeamVisibility } from "./actions";
 
-type Staff = { user_id: string; role: string; status: string; created_at: string; display_name: string | null; greeting_name: string | null; staff_title: string | null; biography: string | null; research_specialties: string | null; profile_photo_url: string | null };
-type Props = { searchParams: Promise<{ error?: string; saved?: string; profileSaved?: string }> };
+type Staff = { user_id: string; role: string; status: string; created_at: string; display_name: string | null; greeting_name: string | null; staff_title: string | null; biography: string | null; research_specialties: string | null; profile_photo_url: string | null; show_on_public_team: boolean };
+type Props = { searchParams: Promise<{ error?: string; saved?: string; profileSaved?: string; visibilitySaved?: string }> };
 
 const messages: Record<string,string> = {
   invalid: "Enter a valid UID, role, status, and names within the allowed lengths.",
@@ -15,6 +15,7 @@ const messages: Record<string,string> = {
   save: "The change could not be saved. Check the UID and database migration.",
   "invalid-profile": "Check profile field lengths and use a valid HTTPS photo URL.",
   "profile-save": "Could not update staff profile. Confirm migration 026 is installed.",
+  "public-team": "Could not update public visibility. Staff must be active and have a Display name. Confirm migration 027 is installed.",
 };
 
 async function TeamContent({ searchParams }: Props) {
@@ -28,7 +29,7 @@ async function TeamContent({ searchParams }: Props) {
     redirect("/staff/dashboard");
   }
   const { data, error: listError } = await supabase.from("staff_members")
-    .select("user_id,role,status,created_at,display_name,greeting_name,staff_title,biography,research_specialties,profile_photo_url").order("created_at", { ascending: true });
+    .select("user_id,role,status,created_at,display_name,greeting_name,staff_title,biography,research_specialties,profile_photo_url,show_on_public_team").order("created_at", { ascending: true });
   const rows = (data ?? []) as Staff[];
   const params = await searchParams;
   const ownerCount = rows.filter(row => row.role === "owner" && row.status === "active").length;
@@ -41,6 +42,7 @@ async function TeamContent({ searchParams }: Props) {
       <p className="mt-3 max-w-2xl text-sm text-slate-200">Manage names, greetings, roles, and account access. Changes take effect in your existing permission checks.</p>
     </div></div>
     <div className="mx-auto max-w-6xl space-y-8 px-5 py-8 sm:px-8">
+      {params.visibilitySaved === "1" && <p role="status" className="rounded-lg border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-900">Public team visibility updated.</p>}
       {params.profileSaved === "1" && <p role="status" className="rounded-lg border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-900">Staff profile updated.</p>}
       {params.saved === "1" && <p role="status" className="rounded-lg border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-900">Staff access updated.</p>}
       {params.error && <p role="alert" className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-900">{messages[params.error] ?? messages.save}</p>}
@@ -85,6 +87,13 @@ async function TeamContent({ searchParams }: Props) {
               <label className="text-sm font-semibold sm:col-span-2">Biography<textarea name="biography" maxLength={1000} rows={4} defaultValue={member.biography ?? ""} placeholder="Research interests, background, and contributions" className="mt-1 block w-full rounded-lg border border-slate-300 px-3 py-2"/></label>
             </div>
             <button type="submit" className="mt-4 rounded-lg bg-[#861F41] px-5 py-2.5 text-sm font-bold text-white hover:bg-[#6d1936]">Save profile details</button>
+          </form>)}
+          <div className="mt-8 border-t border-slate-200 pt-6"><h3 className="text-lg font-bold">Public Meet the Team</h3><p className="mt-1 text-sm text-slate-600">Only staff you explicitly publish will appear at <Link href="/team" className="font-semibold text-[#861F41] underline">/team</Link>. The public page uses <strong>Display name</strong>, never Greeting name. Biographies, specialties, titles, and photo URLs will also be public.</p></div>
+          {rows.map(member => <form action={setPublicTeamVisibility} key={`public-${member.user_id}`} className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-200 p-4">
+            <div><p className="font-semibold">{member.display_name || "Display name required"}</p><p className="text-xs text-slate-600">{member.status === "active" ? "Active" : "Inactive"} · {member.role}</p></div>
+            <input type="hidden" name="user_id" value={member.user_id}/>
+            <label className="flex items-center gap-2 text-sm"><input type="checkbox" name="show_on_public_team" defaultChecked={member.show_on_public_team} className="h-4 w-4 accent-[#861F41]"/> Show publicly</label>
+            <button type="submit" className="rounded-lg bg-[#002144] px-4 py-2 text-sm font-semibold text-white hover:bg-[#103b63]">Save visibility</button>
           </form>)}
           {!listError && rows.length===0 && <p className="text-sm text-slate-600">No staff accounts were found.</p>}
         </div>
