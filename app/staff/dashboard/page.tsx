@@ -18,6 +18,7 @@ const reviewTools: Shortcut[] = [
   { title: "Archive Quality", detail: "Identify missing or unreviewed sources", href: "/staff/quality", symbol: "AQ" },
   { title: "Data Coverage", detail: "Track documented seasons and organizations", href: "/staff/coverage", symbol: "DC" },
   { title: "Corrections", detail: "Review community-submitted corrections", href: "/staff/corrections", symbol: "CR" },
+  { title: "Notifications", detail: "New reports, pending sources, and draft competitions", href: "/staff/notifications", symbol: "NT" },
 ];
 
 function ToolCard({ item }: { item: Shortcut }) {
