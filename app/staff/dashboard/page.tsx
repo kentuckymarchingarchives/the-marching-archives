@@ -55,12 +55,13 @@ async function DashboardContent() {
   if (authError || !userId) redirect("/staff/login");
 
   const { data: staff, error: staffError } = await supabase
-    .from("staff_members").select("role, status").eq("user_id", userId).maybeSingle();
+    .from("staff_members").select("role, status, display_name, greeting_name").eq("user_id", userId).maybeSingle();
   if (staffError || staff?.status !== "active" || !["owner", "admin", "editor"].includes(staff.role)) {
     redirect("/staff/login?error=unauthorized");
   }
 
   const canPublish = staff.role === "owner" || staff.role === "admin";
+  const preferredName = (staff.greeting_name?.trim() || staff.display_name?.trim().split(/\s+/)[0] || "there");
   const roleLabel = staff.role === "owner" ? "Owner" : staff.role === "admin" ? "Administrator" : "Editor";
 
   const [bandCount, competitionCount, publishedCount, draftCount, latestResponse, tasksOpen, tasksMine, corrections, sources, teamCount, auditEvents, recentTasks] = await Promise.all([
@@ -91,7 +92,8 @@ async function DashboardContent() {
           <div className="flex flex-wrap items-start justify-between gap-5">
             <div>
               <p className="text-xs font-bold uppercase tracking-[0.18em] text-[#efbbce]">The Marching Archives / Staff workspace</p>
-              <h1 className="mt-2 text-3xl font-extrabold tracking-tight sm:text-4xl">Archive control center</h1>
+              <h1 className="mt-2 text-3xl font-extrabold tracking-tight sm:text-4xl">Hello, {preferredName}!</h1>
+              <p className="mt-2 text-lg font-semibold text-white/90">Archive control center</p>
               <p className="mt-2 max-w-xl text-sm leading-6 text-slate-200">Manage records, continue historical research, and review work that needs attention—all in one place.</p>
               <p className="mt-4 text-xs text-slate-300"><span className="rounded-full border border-white/25 px-3 py-1 font-bold text-white">{roleLabel}</span><span className="ml-2">Active staff account</span></p>
             </div>
@@ -180,7 +182,6 @@ async function DashboardContent() {
           <div><h2 className="text-xl font-extrabold">Preview the public archive</h2><p className="mt-1 text-sm text-slate-300">Check what visitors can see after updating records.</p></div>
           <div className="flex flex-wrap gap-2"><Link href="/bands" className="rounded-lg bg-white px-4 py-2 text-sm font-bold text-[#002144]">Bands & Corps</Link><Link href="/competitions" className="rounded-lg border border-white/40 px-4 py-2 text-sm font-bold">Competitions</Link><Link href="/power-rankings" className="rounded-lg border border-white/40 px-4 py-2 text-sm font-bold">Power Rankings</Link></div>
         </section>
-        {staff.role === "owner" && <section className="rounded-2xl border border-slate-200 bg-white p-5 sm:p-6"><p className="text-xs font-bold uppercase tracking-widest text-[#861F41]">Infrastructure</p><h2 className="mt-1 text-xl font-extrabold">Backup & recovery</h2><p className="mt-2 text-sm text-slate-600">Run and check encrypted backups under your GitHub repository’s Actions tab. Backups are not activated merely by installing this dashboard; configure Phase 6 secrets and verify a successful test first.</p><p className="mt-3 text-xs text-slate-500">Guide in the repository: <code>docs/BACKUP-AND-RESTORE.md</code></p></section>}
         <p className="text-xs leading-5 text-slate-500">Some tools (Power Rankings, Corrections, Documents, Quality, Coverage) require their separate feature installations and database migrations. A link may lead to a 404 until that feature has been deployed. All permissions continue to be enforced by the linked pages and server actions.</p>
       </div>
     </main>
