@@ -166,6 +166,7 @@ async function BandProfileContent({ params }: Props) {
             <a href="#overview" className="rounded-lg bg-white px-4 py-2 text-sm font-bold text-[#002144]">Overview</a>
             <a href="#history" className="rounded-lg border border-white/25 px-4 py-2 text-sm font-semibold text-white hover:bg-white/10">Competition history</a>
             <a href="#names" className="rounded-lg border border-white/25 px-4 py-2 text-sm font-semibold text-white hover:bg-white/10">Historical names</a>
+            <Link href={`/bands/${band.slug}/timeline`} className="rounded-lg border border-white/25 px-4 py-2 text-sm font-semibold text-white hover:bg-white/10">Interactive timeline ↗</Link>
             <Link href={`/bands/${band.slug}/achievements`} className="rounded-lg border border-white/25 px-4 py-2 text-sm font-semibold text-white hover:bg-white/10">Achievements ↗</Link>
             <Link href={`/bands/${band.slug}/statistics`} className="rounded-lg border border-white/25 px-4 py-2 text-sm font-semibold text-white hover:bg-white/10">Statistics ↗</Link>
           </nav>

@@ -6,9 +6,8 @@ import { createClient } from "@/lib/supabase/server";
 import { UUID_PATTERN } from "@/lib/band-validation";
 import { BAND_SLUG_PATTERN } from "@/lib/band-slugs";
 import { competitionPublicUrl, roundPublicUrl } from "@/lib/public-competition-routes";
-import BandProfileNavigation from "@/components/BandProfileNavigation";
+import InteractiveBandTimeline, { type TimelineSeason, type TimelineEntry } from "@/components/InteractiveBandTimeline";
 
-export const instant = false;
 
 type Props = { params: Promise<{ id: string }> };
 type Entry = {
@@ -66,21 +65,7 @@ async function fetchBatches<T>(
   return all;
 }
 
-function formatScore(value: number | string | null): string {
-  if (value == null || value === "") return "—";
-  const number = Number(value);
-  return Number.isFinite(number) ? number.toFixed(3) : "—";
-}
-
-function formatDate(date: string | null): string {
-  if (!date) return "Date not recorded";
-  const parsed = new Date(`${date}T12:00:00Z`);
-  return Number.isNaN(parsed.getTime())
-    ? "Date not recorded"
-    : parsed.toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: "UTC" });
-}
-
-function roundUrl(item: Performance): string {
+function eventUrl(item: Performance): string {
   const identifier = item.competition.slug ?? item.competition.id;
   return item.round.slug
     ? roundPublicUrl(identifier, item.round.slug)
@@ -147,92 +132,58 @@ async function TimelineContents({ params }: Props) {
     yearGroups.get(year)!.push(item);
   }
   const years = [...new Set([...yearGroups.keys(), ...names.flatMap(n => n.start_year !== null ? [n.start_year] : [])])].sort((a,b) => b-a);
-  const overallWins = performances.filter(p => p.entry.overall_placement === 1).length;
-  const overallPodiums = performances.filter(p => p.entry.overall_placement !== null && p.entry.overall_placement <= 3).length;
-  const finals = performances.filter(isChampionshipFinal).length;
+  const seasons: TimelineSeason[] = years.map(year => ({
+    year,
+    nameChanges: names.filter(n => n.start_year === year).map(n => ({
+      id: n.id, name: n.historical_name, endYear: n.end_year,
+    })),
+    entries: (yearGroups.get(year) ?? []).map(item => ({
+      id: item.entry.id,
+      competitionName: item.competition.name,
+      competitionDate: item.competition.competition_date,
+      organization: item.competition.organization_code,
+      roundName: item.round.name,
+      url: eventUrl(item),
+      overallPlacement: item.entry.overall_placement,
+      classPlacement: item.entry.class_placement,
+      classification: item.entry.classification,
+      totalScore: item.entry.total_score == null ? null : String(item.entry.total_score),
+      championshipFinals: isChampionshipFinal(item),
+    } satisfies TimelineEntry)),
+  }));
 
   return (
-    <main className="min-h-screen bg-[#F4F6F9] text-[#002144]">
+    <main className="min-h-screen bg-[#F6F8FA] text-[#002144]">
       <section className="bg-[#002144] text-white">
-        <div className="mx-auto max-w-6xl px-5 py-10 sm:px-8">
+        <div className="mx-auto max-w-6xl px-5 pb-12 pt-10 sm:px-8">
           <nav aria-label="Breadcrumb" className="flex flex-wrap gap-2 text-sm text-slate-300">
             <Link href="/bands" className="hover:text-white">Bands &amp; Corps</Link>
-            <span>/</span>
+            <span aria-hidden="true">/</span>
             <Link href={`/bands/${band.slug}`} className="hover:text-white">{band.name}</Link>
-            <span>/</span><span className="text-white">Timeline</span>
+            <span aria-hidden="true">/</span><span aria-current="page" className="text-white">Timeline</span>
           </nav>
-          <p className="mt-7 text-xs font-bold uppercase tracking-[.2em] text-[#e7a9bb]">Ensemble history</p>
-          <h1 className="mt-2 text-3xl font-extrabold tracking-tight sm:text-4xl">{band.name}: Historical Timeline</h1>
-          <p className="mt-4 max-w-2xl text-sm leading-7 text-slate-200">Explore recorded competition appearances and historical ensemble names, organized chronologically by season.</p>
+          <p className="mt-8 text-xs font-bold uppercase tracking-[.2em] text-[#efb8ca]">The archive / Ensemble history</p>
+          <h1 className="mt-3 text-4xl font-black tracking-tight sm:text-5xl">{band.name}: Historical Timeline</h1>
+          <p className="mt-4 max-w-2xl text-sm leading-7 text-slate-200">Explore documented competition appearances and historical names, year by year.</p>
+          <Link href={`/bands/${band.slug}`} className="mt-6 inline-flex rounded-lg border border-white/30 px-4 py-2 text-sm font-semibold text-white hover:bg-white/10">← Back to ensemble profile</Link>
         </div>
       </section>
-      <BandProfileNavigation slug={band.slug} />
-      <div className="mx-auto max-w-6xl space-y-8 px-5 py-10 sm:px-8">
-        {truncated && <div role="status" className="rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900">This ensemble has more than {MAX_ENTRIES.toLocaleString()} recorded entries. The timeline is partial; additional historical records are not included.</div>}
-        <section aria-label="Recorded timeline summary" className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-          {[
-            ["Published round entries", performances.length],
-            ["Overall first places", overallWins],
-            ["Overall podium finishes", overallPodiums],
-            ["Championship finals rounds", finals],
-          ].map(([label, value]) => <div key={label} className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm"><p className="text-xs font-bold uppercase tracking-wider text-[#861F41]">{label}</p><p className="mt-3 text-3xl font-bold tabular-nums">{value}</p></div>)}
-        </section>
-        <section className="rounded-xl border border-slate-200 bg-white p-5 text-sm leading-7 text-slate-600">
-          <h2 className="text-lg font-bold text-[#002144]">About this timeline</h2>
-          <p className="mt-2">This page reflects <strong>published, non-archived competition records</strong> currently documented in the archive. Semifinals and Finals are separate round appearances. Missing years do not prove the ensemble did not compete. Recorded first-place finishes and championship-finals appearances are not, by themselves, confirmation of official championship titles.</p>
-        </section>
-        {years.length === 0 ? (
-          <div className="rounded-xl border border-slate-200 bg-white p-10 text-center text-slate-600">No dated competition results or historical name changes have been recorded for this ensemble yet.</div>
-        ) : (
-          <section aria-label="Season timeline" className="space-y-6">
-            <h2 className="text-2xl font-extrabold">Season-by-season history</h2>
-            <div className="space-y-7 border-l-2 border-[#861F41]/30 pl-6 sm:pl-8">
-              {years.map(year => {
-                const season = yearGroups.get(year) ?? [];
-                const seasonNames = names.filter(n => n.start_year === year);
-                return (
-                  <article key={year} className="relative rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-7">
-                    <span aria-hidden="true" className="absolute -left-8.5 top-8 h-3 w-3 rounded-full border-2 border-white bg-[#861F41] sm:-left-10.5" />
-                    <div className="flex flex-wrap items-center justify-between gap-3">
-                      <h3 className="text-2xl font-extrabold">{year}</h3>
-                      <span className="text-xs font-semibold text-slate-500">{season.length} recorded round {season.length === 1 ? "appearance" : "appearances"}</span>
-                    </div>
-                    {seasonNames.length > 0 && <div className="mt-4 space-y-2">{seasonNames.map(n => <p key={n.id} className="rounded-lg bg-[#F4F6F9] px-4 py-3 text-sm"><span className="font-bold text-[#861F41]">Historical name recorded:</span> {n.historical_name}{n.end_year != null ? ` (${year}–${n.end_year})` : ` (from ${year})`}</p>)}</div>}
-                    {season.length > 0 && <ol className="mt-5 divide-y divide-slate-100">{season.map(item => {
-                      const isFinal = isChampionshipFinal(item);
-                      const isWin = item.entry.overall_placement === 1;
-                      const isPodium = item.entry.overall_placement !== null && item.entry.overall_placement <= 3;
-                      return <li key={item.entry.id} className="py-4 first:pt-0 last:pb-0">
-                        <div className="flex flex-wrap items-start justify-between gap-3">
-                          <div className="min-w-0 flex-1">
-                            <p className="text-xs text-slate-500">{formatDate(item.competition.competition_date)} · {item.competition.organization_code} · {item.round.name}</p>
-                            <Link className="mt-1 inline-block font-bold text-[#002144] hover:text-[#861F41] hover:underline" href={roundUrl(item)}>{item.competition.name}</Link>
-                            <div className="mt-2 flex flex-wrap gap-2 text-xs">
-                              {isWin && <span className="rounded-full bg-emerald-50 px-3 py-1 font-semibold text-emerald-800">Recorded overall 1st</span>}
-                              {!isWin && isPodium && <span className="rounded-full bg-sky-50 px-3 py-1 font-semibold text-sky-800">Overall podium</span>}
-                              {isFinal && <span className="rounded-full bg-purple-50 px-3 py-1 font-semibold text-purple-800">Championship finals appearance</span>}
-                            </div>
-                          </div>
-                          <div className="text-right text-xs text-slate-600">
-                            <p>Overall: <strong className="text-[#002144]">{item.entry.overall_placement ?? "—"}</strong></p>
-                            <p className="mt-1">Class: <strong className="text-[#002144]">{item.entry.class_placement ?? "—"}</strong>{item.entry.classification ? ` (${item.entry.classification})` : ""}</p>
-                            <p className="mt-1">Score: <strong className="tabular-nums text-[#002144]">{formatScore(item.entry.total_score)}</strong></p>
-                          </div>
-                        </div>
-                      </li>;
-                    })}</ol>}
-                  </article>
-                );
-              })}
-            </div>
-          </section>
-        )}
-        {names.some(n => n.start_year === null) && <section className="rounded-xl border border-slate-200 bg-white p-5"><h2 className="font-bold">Other historical names (dates not recorded)</h2><ul className="mt-3 list-disc space-y-1 pl-5 text-sm text-slate-700">{names.filter(n => n.start_year === null).map(n => <li key={n.id}>{n.historical_name}{n.end_year !== null ? ` (through ${n.end_year})` : ""}</li>)}</ul></section>}
+      <div className="mx-auto max-w-6xl px-5 py-10 sm:px-8">
+        {truncated && <div role="status" className="mb-6 rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900">More than {MAX_ENTRIES.toLocaleString()} entries are recorded. This timeline displays a partial selection and its counts may be incomplete.</div>}
+        <InteractiveBandTimeline
+          seasons={seasons}
+          undatedNames={names.filter(n => n.start_year === null).map(n => ({ id: n.id, name: n.historical_name, endYear: n.end_year }))}
+          bandName={band.name}
+        />
       </div>
     </main>
   );
 }
 
 export default function BandTimelinePage(props: Props) {
-  return <Suspense fallback={<main className="mx-auto max-w-6xl p-8 text-sm text-slate-600" role="status">Loading historical timeline…</main>}><TimelineContents params={props.params} /></Suspense>;
+  return (
+    <Suspense fallback={<main className="mx-auto max-w-6xl p-8 text-sm text-slate-600" role="status">Loading historical timeline…</main>}>
+      <TimelineContents params={props.params} />
+    </Suspense>
+  );
 }
