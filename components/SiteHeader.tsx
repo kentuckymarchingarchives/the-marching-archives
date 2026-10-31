@@ -47,13 +47,13 @@ export default function SiteHeader() {
             width={76}
             height={76}
             priority
-            className="h-16 w-16 shrink-0 object-contain sm:h-19 sm:w-19"
+            className="h-12 w-12 shrink-0 object-contain min-[390px]:h-14 min-[390px]:w-14 sm:h-19 sm:w-19"
           />
           <span className="min-w-0">
-            <span className="block text-[17px] font-extrabold leading-tight tracking-tight text-[#002144] sm:text-[22px]">
+            <span className="block text-[13px] font-extrabold leading-tight tracking-tight text-[#002144] min-[390px]:text-[16px] sm:text-[22px]">
               The Marching Archives
             </span>
-            <span className="mt-1 block text-[9px] font-bold uppercase tracking-[0.145em] text-[#64758A] sm:text-[11px]">
+            <span className="mt-1 hidden text-[9px] font-bold uppercase tracking-[0.145em] text-[#64758A] min-[390px]:block sm:text-[11px]">
               Competitive History, Preserved
             </span>
           </span>
