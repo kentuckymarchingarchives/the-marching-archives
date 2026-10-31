@@ -12,6 +12,7 @@ import {
 } from "@/lib/public-competition-routes";
 
 import BandLogo from "@/components/BandLogo";
+import RoundResearchTools from "@/components/RoundResearchTools";
 
 export const instant = false;
 
@@ -471,6 +472,17 @@ async function RoundContent({ params }: Props) {
           </div>
         </div>
       </header>
+
+      <RoundResearchTools
+        competitionName={competition.name}
+        roundName={round.name}
+        seasonYear={competition.season_year}
+        organizationCode={competition.organization_code}
+        competitionDate={competition.competition_date}
+        sourceUrl={source}
+        csvUrl={`/competitions/${competition.slug}/rounds/${round.slug}/export.csv`}
+        canExport={!incomplete}
+      />
 
       {incomplete && (
         <div
