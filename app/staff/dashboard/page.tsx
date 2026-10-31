@@ -24,6 +24,7 @@ const reviewTools: Shortcut[] = [
   { title: "Duplicate Detection", detail: "Review potential duplicate historical records", href: "/staff/duplicates", symbol: "DD" },
   {title: "Recently Added", detail: "Recent published records and verification activity", href: "/staff/recent", symbol: "RC",},
   {title: "Data Completeness", detail: "Find competition records missing documented results or sources", href: "/staff/completeness", symbol: "DC",},
+  {title: "Research Priorities", detail: "Incomplete records, corrections, sources and assignments", href: "/staff/priorities", symbol: "RP",},
 ];
 
 const administrationTools: Shortcut[] = [
