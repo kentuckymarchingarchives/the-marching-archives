@@ -22,8 +22,8 @@ const reviewTools: Shortcut[] = [
   { title: "Research Assignments", detail: "Team tasks, priority, and progress", href: "/staff/research", symbol: "RA" },
   { title: "Staff Profiles", detail: "Team directory and documented research contributions", href: "/staff/profiles", symbol: "SP" },
   { title: "Duplicate Detection", detail: "Review potential duplicate historical records", href: "/staff/duplicates", symbol: "DD" },
-  {title: "Recently Added", detail: "Recent published records and verification activity", href: "/staff/recent", symbol: "RC",
-},
+  {title: "Recently Added", detail: "Recent published records and verification activity", href: "/staff/recent", symbol: "RC",},
+  {title: "Data Completeness", detail: "Find competition records missing documented results or sources", href: "/staff/completeness", symbol: "DC",},
 ];
 
 const administrationTools: Shortcut[] = [
