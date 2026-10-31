@@ -26,6 +26,7 @@ const reviewTools: Shortcut[] = [
 
 const administrationTools: Shortcut[] = [
   { title: "Staff Management", detail: "Roles, account access, and staff status", href: "/staff/team", symbol: "TM" },
+  { title: "Section Controls", detail: "Set public sections online or temporarily offline", href: "/staff/sections", symbol: "SC" },
   { title: "Activity & Audit Log", detail: "Review documented changes to archive records", href: "/staff/activity", symbol: "AL" },
 ];
 
@@ -178,7 +179,7 @@ async function DashboardContent() {
         {canPublish && <section aria-labelledby="team-heading">
           <div className="flex flex-wrap items-end justify-between gap-3"><SectionHeading kicker="Restricted workspace" title="Team & accountability" id="team-heading" description="Only authorized staff can access administrative records." /><span className="text-xs text-slate-500">Active staff: {teamCount.error || teamCount.count === null ? "Unavailable" : teamCount.count.toLocaleString()}</span></div>
           <div className="mt-5 grid gap-5 lg:grid-cols-2">
-            <div className="grid gap-4 sm:grid-cols-2">{administrationTools.filter(item => staff.role === "owner" || item.href !== "/staff/team").map(item => <ToolCard key={item.href} item={item} />)}</div>
+            <div className="grid gap-4 sm:grid-cols-2">{administrationTools.filter(item => staff.role === "owner" || !["/staff/team", "/staff/sections"].includes(item.href)).map(item => <ToolCard key={item.href} item={item} />)}</div>
             <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
               <div className="flex flex-wrap items-center justify-between gap-2"><h3 className="text-base font-extrabold">Recent archive activity</h3><Link className="text-xs font-bold text-[#861F41] hover:underline" href="/staff/activity">View audit log →</Link></div>
               {auditEvents.error ? <p role="alert" className="mt-4 text-sm text-amber-800">Activity log unavailable. Check migration 021.</p> : !auditEvents.data?.length ? <p className="mt-4 text-sm text-slate-500">No recorded changes yet.</p> : <ul className="mt-3 divide-y divide-slate-100">{auditEvents.data.map(event => <li className="flex items-center justify-between gap-3 py-3" key={event.id}><div><p className="text-sm font-semibold capitalize">{event.table_name.replaceAll("_", " ")}</p><p className="mt-1 text-xs text-slate-500">{event.operation}</p></div><span className="text-xs text-slate-500">{event.occurred_at.slice(0,10)}</span></li>)}</ul>}
