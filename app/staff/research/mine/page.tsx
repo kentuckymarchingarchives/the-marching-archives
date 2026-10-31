@@ -1,7 +1,8 @@
+import ResearchNavigation from "@/components/staff/ResearchNavigation";
 import Link from "next/link";
 import { Suspense } from "react";
 import { connection } from "next/server";
-import { researchSession, dateText, researchLinks, type ResearchTask, type ResearchApproval } from "@/lib/research-insights";
+import { researchSession, dateText, type ResearchTask, type ResearchApproval } from "@/lib/research-insights";
 
 export const instant = false;
 
@@ -30,7 +31,7 @@ async function MyResearchContent() {
       <p className="mt-3 text-sm text-slate-200">Hello, {greeting}! Here's the work currently assigned to you.</p>
     </div></header>
     <div className="mx-auto max-w-6xl space-y-7 px-6 py-9">
-      <nav className="flex flex-wrap gap-2" aria-label="Research pages">{researchLinks.map(l => <Link key={l.href} href={l.href} className={`rounded-lg px-3 py-2 text-sm font-bold ${l.href.endsWith("/mine") ? "bg-[#861F41] text-white" : "border border-slate-200 bg-white"}`}>{l.label}</Link>)}</nav>
+      <ResearchNavigation currentPath="/staff/research/mine" />
       {failed && <p role="alert" className="rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm">My Research data is unavailable. Confirm migrations 022 and 036 are installed.</p>}
       {!failed && (tasks.length === 500 || approvals.length === 500) && <p className="rounded-xl border border-blue-200 bg-blue-50 p-4 text-sm">Showing a bounded sample of your latest 500 assignments and submissions. Some older entries may be missing.</p>}
       <section aria-label="My task overview" className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">{[

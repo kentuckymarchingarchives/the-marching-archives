@@ -1,7 +1,8 @@
+import ResearchNavigation from "@/components/staff/ResearchNavigation";
 import Link from "next/link";
 import { Suspense } from "react";
 import { connection } from "next/server";
-import { researchSession, researchLinks } from "@/lib/research-insights";
+import { researchSession } from "@/lib/research-insights";
 
 export const instant = false;
 
@@ -65,21 +66,7 @@ async function ResearchAnalyticsContent() {
         </div>
       </header>
       <div className="mx-auto max-w-6xl space-y-7 px-6 py-9">
-        <nav className="flex flex-wrap gap-2" aria-label="Research pages">
-          {researchLinks.map((link) => (
-            <Link
-              key={link.href}
-              href={link.href}
-              className={`rounded-lg px-3 py-2 text-sm font-bold ${
-                link.href.endsWith("/analytics")
-                  ? "bg-[#861F41] text-white"
-                  : "border border-slate-200 bg-white"
-              }`}
-            >
-              {link.label}
-            </Link>
-          ))}
-        </nav>
+        <ResearchNavigation currentPath="/staff/research/analytics" />
 
         {!analytics && (
           <p role="alert" className="rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm">

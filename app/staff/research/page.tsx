@@ -1,3 +1,4 @@
+import ResearchNavigation from "@/components/staff/ResearchNavigation";
 import Link from "next/link";
 import { Suspense } from "react";
 import { redirect } from "next/navigation";
@@ -70,6 +71,7 @@ async function ResearchContent({ searchParams }: Props) {
       <p className="mt-3 max-w-2xl text-sm leading-7 text-slate-200">Coordinate historical research, record deadlines, and track the next steps for archive coverage.</p>
     </div></header>
     <div className="mx-auto max-w-6xl space-y-7 px-5 py-9">
+      <ResearchNavigation currentPath="/staff/research" />
       {params.saved && <p role="status" className="rounded-lg border border-green-200 bg-green-50 p-4 text-sm text-green-900">Research task saved successfully.</p>}
       {params.error && <p role="alert" className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-900">{messages[params.error] ?? messages.save}</p>}
       {(tasksResponse.error || membersResponse.error) && <p role="alert" className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-950">Unable to load {tasksResponse.error ? "research assignments" : "staff members"}. Confirm migration 022 is installed and your account can access the data. Counts are unavailable until the query succeeds.</p>}
