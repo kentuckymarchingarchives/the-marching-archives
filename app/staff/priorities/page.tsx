@@ -4,6 +4,7 @@ import { Suspense } from "react";
 import { connection } from "next/server";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import QuickResearchAssignment from "@/components/QuickResearchAssignment";
 
 export const metadata: Metadata = {
   title: "Research Priority Center | TMA Staff",
@@ -35,6 +36,7 @@ type Source = {
   competition_id: string;
   created_at: string;
 };
+type StaffMember = { user_id: string; display_name: string | null; greeting_name: string | null; role: string; status: string };
 type Task = {
   id: string;
   title: string;
@@ -95,7 +97,7 @@ async function Content({ searchParams }: PageProps) {
 
   // Existing staff-only RPC (migration 032) and existing staff RLS policies.
   // Results are deliberately bounded; counts below are exact only where noted.
-  const [completeness, correctionCount, correctionList, sourceCount, sourceList, taskCount, taskList] = await Promise.all([
+  const [completeness, correctionCount, correctionList, sourceCount, sourceList, taskCount, taskList, membersResult] = await Promise.all([
     supabase.rpc("tma_staff_competition_completeness", {
       p_organization: org === "all" ? null : org,
       p_publication: "all",
@@ -108,9 +110,11 @@ async function Content({ searchParams }: PageProps) {
     supabase.from("competition_sources").select("id,title,competition_id,created_at").is("reviewed_at", null).order("created_at", { ascending: false }).limit(5),
     supabase.from("research_assignments").select("id", { head: true, count: "exact" }).neq("status", "completed"),
     supabase.from("research_assignments").select("id,title,priority,status,due_date,assigned_to").neq("status", "completed").order("updated_at", { ascending: false }).limit(200),
+    supabase.from("staff_members").select("user_id,display_name,greeting_name,role,status").eq("status", "active").order("role"),
   ]);
 
   const records = (completeness.error ? [] : completeness.data ?? []) as CompletenessRecord[];
+  const members = (membersResult.error ? [] : membersResult.data ?? []) as StaffMember[];
   const corrections = (correctionList.error ? [] : correctionList.data ?? []) as Correction[];
   const sources = (sourceList.error ? [] : sourceList.data ?? []) as Source[];
   const tasks = (taskList.error ? [] : taskList.data ?? []) as Task[];
@@ -128,6 +132,7 @@ async function Content({ searchParams }: PageProps) {
     (correctionCount.error || correctionList.error) && "corrections",
     (sourceCount.error || sourceList.error) && "sources",
     (taskCount.error || taskList.error) && "research assignments (migration 022)",
+    membersResult.error && "staff directory (migration 024)",
   ].filter(Boolean);
 
   return (
@@ -172,6 +177,22 @@ async function Content({ searchParams }: PageProps) {
             <div className="mt-5 divide-y divide-slate-100">{records.slice(0, 8).map(record => <article key={record.competition_id} className="flex flex-wrap items-center justify-between gap-4 py-4">
               <div className="min-w-0"><p className="text-xs font-black uppercase tracking-wide text-[#861F41]">{record.organization_code} · {record.season_year} · {record.publication_status}</p><h3 className="mt-1 font-bold">{record.competition_name}</h3><p className="mt-1 text-xs text-slate-500">{record.entry_count} entries · {record.reviewed_source_count} reviewed sources · {record.verification_current ? "Verified" : "Verification needed"}</p></div>
               <div className="flex items-center gap-3"><span className="rounded-full bg-slate-100 px-3 py-1.5 text-sm font-black tabular-nums">{record.completeness_score}/100</span><Link href={`/staff/competitions/${record.competition_id}`} className="text-sm font-bold text-[#861F41] hover:underline">Open →</Link></div>
+              <div className="w-full"><QuickResearchAssignment
+                competitionId={record.competition_id}
+                competitionName={record.competition_name}
+                organization={record.organization_code}
+                season={record.season_year}
+                completenessScore={record.completeness_score}
+                missing={[
+                  ...(record.entry_count === 0 ? ["result entries"] : []),
+                  ...(record.entry_count > 0 && record.placement_count < record.entry_count ? ["placements"] : []),
+                  ...(record.entry_count > 0 && record.scored_count < record.entry_count ? ["total scores"] : []),
+                  ...(record.reviewed_source_count === 0 ? ["reviewed historical sources"] : []),
+                  ...(!record.verification_current ? ["current verification"] : []),
+                ]}
+                staff={members}
+                disabled={Boolean(membersResult.error)}
+              /></div>
             </article>)}</div>
           )}
         </section>}
@@ -195,7 +216,7 @@ async function Content({ searchParams }: PageProps) {
         </section>}
         <aside className="rounded-2xl border border-slate-200 bg-white p-6 text-sm leading-7 text-slate-600">
           <h2 className="text-lg font-black text-[#002144]">How to use this center</h2>
-          <p className="mt-2">This page combines existing research signals without changing their status or automatically creating tasks. A lower documentation score deserves review, but does not establish that a source is wrong. Correction and source queues are independent of the competition completeness score.</p>
+          <p className="mt-2">This page combines existing research signals. Creating a research assignment is always a deliberate staff action; it never automatically changes a competition record. A lower documentation score deserves review, but does not establish that a source is wrong. Correction and source queues are independent of the competition completeness score.</p>
           <p className="mt-2">Organization filters apply only to competition completeness. Correction, source, and task counts cover the records visible to your staff account under existing database policies.</p>
         </aside>
       </div>
