@@ -142,8 +142,8 @@ async function HistoryContent({ params, searchParams }: PageProps) {
               <p className="mb-3 break-all text-xs text-slate-500">Record ID: {event.record_id}</p>
               {fields.length ? <dl className="space-y-3">{fields.map(f => <div key={f.key} className="grid gap-2 rounded-lg bg-[#f8fafc] p-3 sm:grid-cols-[180px_1fr_1fr]">
                 <dt className="text-sm font-bold">{FIELD_NAMES[f.key] ?? f.key.replaceAll("_", " ")}</dt>
-                <dd className="min-w-0 break-words text-sm text-slate-500"><span className="block text-xs font-bold uppercase tracking-wider">Before</span>{renderValue(f.before)}</dd>
-                <dd className="min-w-0 break-words text-sm text-[#002144]"><span className="block text-xs font-bold uppercase tracking-wider">After</span>{renderValue(f.after)}</dd>
+                <dd className="min-w-0 wrap-break-word text-sm text-slate-500"><span className="block text-xs font-bold uppercase tracking-wider">Before</span>{renderValue(f.before)}</dd>
+                <dd className="min-w-0 wrap-break-word text-sm text-[#002144]"><span className="block text-xs font-bold uppercase tracking-wider">After</span>{renderValue(f.after)}</dd>
               </div>)}</dl> : <p className="text-sm text-slate-600">No comparable tracked fields in this event.</p>}
             </div>
           </article>;
