@@ -110,6 +110,13 @@ async function CompetitionToolbar({
           </Link>
 
           <Link
+            href={`/staff/competitions/${id}/notes`}
+            className="cursor-pointer rounded-lg border border-[#861F41]/30 bg-white px-5 py-3 text-sm font-bold text-[#861F41] hover:bg-[#fff3f7]"
+          >
+            Research Notes
+          </Link>
+
+          <Link
             href={`/staff/competitions/${id}/publish`}
             className="cursor-pointer rounded-lg bg-[#861F41] px-5 py-3 text-sm font-bold text-white hover:bg-[#A02B52]"
           >
