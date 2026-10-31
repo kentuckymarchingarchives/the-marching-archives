@@ -1,6 +1,7 @@
 
 import Link from "next/link";
 import LatestArchiveUpdates from "@/components/LatestArchiveUpdates";
+import LatestArchiveActivity from "@/components/LatestArchiveActivity";
 
 const entries = [
   {
@@ -245,6 +246,12 @@ export default function HomePage() {
 
       {/* LATEST ARCHIVE NEWS & UPDATES */}
       <LatestArchiveUpdates />
+      
+      {/* Owner-written news and announcements */}
+      <LatestArchiveUpdates />
+
+      {/* Automatically generated archive activity */}
+      <LatestArchiveActivity />
 
       {/* MADE FOR CURIOSITY */}
       <section className="border-y border-[#e1e6eb] bg-white">

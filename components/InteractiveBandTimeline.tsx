@@ -93,7 +93,7 @@ export default function InteractiveBandTimeline({ seasons, undatedNames, bandNam
         <div className="mb-5 flex flex-wrap items-center justify-between gap-3"><h2 className="text-2xl font-black">Season-by-season history</h2><span className="text-sm text-slate-500">{filtered.length} {filtered.length === 1 ? "year" : "years"} shown</span></div>
         <div className="space-y-6 border-l-2 border-[#861F41]/30 pl-6 sm:pl-8">
           {filtered.map(s => <article key={s.year} className="relative rounded-2xl border border-[#DFE6EE] bg-white shadow-sm">
-            <span aria-hidden="true" className="absolute -left-[34px] top-7 h-3 w-3 rounded-full border-2 border-white bg-[#861F41] sm:-left-[42px]" />
+            <span aria-hidden="true" className="absolute -left-8.5 top-7 h-3 w-3 rounded-full border-2 border-white bg-[#861F41] sm:-left-10.5" />
             <button type="button" aria-expanded={isExpanded(s.year)} aria-controls={`timeline-year-${s.year}`} onClick={() => toggle(s.year)} className="flex w-full items-center justify-between gap-3 rounded-2xl p-5 text-left hover:bg-slate-50 sm:p-7">
               <span><span className="block text-3xl font-black">{s.year}</span><span className="mt-1 block text-sm text-slate-500">{s.entries.length} recorded round {s.entries.length === 1 ? "appearance" : "appearances"}</span></span>
               <span className="rounded-lg bg-[#F6F8FA] px-3 py-2 text-sm font-semibold text-[#861F41]">{isExpanded(s.year) ? "Hide −" : "Explore +"}</span>
