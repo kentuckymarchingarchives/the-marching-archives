@@ -820,7 +820,7 @@ export default function SearchPage(props: Props) {
   return (
     <main className="min-h-screen bg-[#f6f7f9]">
       <section className="relative overflow-hidden bg-[#002144] px-6 py-14 text-white md:py-20">
-        <div className="pointer-events-none absolute right-[-12rem] top-[-12rem] h-[32rem] w-[32rem] rounded-full bg-[#861F41]/25 blur-3xl" />
+        <div className="pointer-events-none absolute right-48 top-48 h-128 w-lg rounded-full bg-[#861F41]/25 blur-3xl" />
         <div className="relative mx-auto max-w-7xl md:px-2">
           <nav aria-label="Breadcrumb" className="mb-7 text-sm text-slate-300">
             <Link href="/" className="hover:text-white">Home</Link> <span className="mx-2 text-slate-500">/</span> <span aria-current="page" className="font-semibold text-white">Search</span>

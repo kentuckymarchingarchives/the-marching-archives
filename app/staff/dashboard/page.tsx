@@ -95,9 +95,9 @@ async function DashboardContent() {
     <main className="min-h-screen bg-[#f6f8fb] text-[#002144]">
       {/* Personal workspace: designed to work with existing TMA shared header/footer. */}
       <section className="relative overflow-hidden bg-[#002144] text-white">
-        <div aria-hidden="true" className="pointer-events-none absolute -right-24 -top-28 h-80 w-80 rounded-full border-[52px] border-white/[0.035]" />
+        <div aria-hidden="true" className="pointer-events-none absolute -right-24 -top-28 h-80 w-80 rounded-full border-52 border-white/[0.035]" />
         <div aria-hidden="true" className="pointer-events-none absolute -bottom-52 right-1/4 h-80 w-80 rounded-full bg-[#861F41]/30 blur-3xl" />
-        <div className="relative mx-auto max-w-[1320px] px-5 py-10 sm:px-8 sm:py-14">
+        <div className="relative mx-auto max-w-330 px-5 py-10 sm:px-8 sm:py-14">
           <div className="flex flex-wrap items-start justify-between gap-5">
             <div className="max-w-2xl">
               <p className="text-xs font-black uppercase tracking-[0.2em] text-[#e8afc2]">The Marching Archives / Staff workspace</p>
@@ -120,7 +120,7 @@ async function DashboardContent() {
         </div>
       </section>
 
-      <div className="mx-auto max-w-[1320px] space-y-10 px-5 py-9 sm:px-8 sm:py-12">
+      <div className="mx-auto max-w-330 space-y-10 px-5 py-9 sm:px-8 sm:py-12">
         <section aria-labelledby="archive-overview-heading">
           <SectionHeading kicker="At a glance" title="Archive overview" id="archive-overview-heading" description="Live totals from your existing archive." />
           <div className="mt-5 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
