@@ -20,6 +20,10 @@ const reviewTools: Shortcut[] = [
   { title: "Corrections", detail: "Review community-submitted corrections", href: "/staff/corrections", symbol: "CR" },
   { title: "Notifications", detail: "Corrections, sources, and unpublished records", href: "/staff/notifications", symbol: "NT" },
   { title: "Research Assignments", detail: "Team tasks, priority, and progress", href: "/staff/research", symbol: "RA" },
+  { title: "My Research", detail: "Your assignments and research awaiting review", href: "/staff/research/mine", symbol: "MR" },
+  { title: "Research Approvals", detail: "Submit research, approve submissions, or request changes", href: "/staff/research/approvals", symbol: "AP" },
+  { title: "Research Analytics", detail: "Team progress, overdue assignments, and approval trends", href: "/staff/research/analytics", symbol: "AN" },
+  { title: "Approval History", detail: "Recorded research submissions and review decisions", href: "/staff/research/review-history", symbol: "RH" },
   { title: "Staff Profiles", detail: "Team directory and documented research contributions", href: "/staff/profiles", symbol: "SP" },
   { title: "Duplicate Detection", detail: "Review potential duplicate historical records", href: "/staff/duplicates", symbol: "DD" },
   {title: "Recently Added", detail: "Recent published records and verification activity", href: "/staff/recent", symbol: "RC",},
@@ -140,7 +144,7 @@ async function DashboardContent() {
             <Link href="/staff/notifications" className="text-sm font-bold text-[#861F41] hover:underline">All notifications →</Link>
           </div>
           <div className="mt-5 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-            <Metric label="My open tasks" value={tasksMine.error ? null : tasksMine.count} description="Assigned to you" href="/staff/research?mine=1" accent />
+            <Metric label="My open tasks" value={tasksMine.error ? null : tasksMine.count} description="Assigned to you" href="/staff/research/mine" accent />
             <Metric label="Team open tasks" value={tasksOpen.error ? null : tasksOpen.count} description="Awaiting completion" href="/staff/research" />
             <Metric label="New corrections" value={corrections.error ? null : corrections.count} description="Visitor reports to review" href="/staff/corrections?status=new" />
             <Metric label="Unreviewed sources" value={sources.error ? null : sources.count} description="Citations awaiting review" href="/staff/quality" />
