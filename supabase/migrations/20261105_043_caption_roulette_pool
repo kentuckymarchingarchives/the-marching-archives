@@ -1,0 +1,135 @@
+-- The Marching Archives | TMA Games 043 | Read-only KMEA caption pool
+-- Eligible records: published, non-archived KMEA competitions from 1996 onward.
+-- Only COMPLETE captions belonging to a real 100-point round layout are used.
+-- Layouts must match exactly on caption name, maximum, and multiplier.
+-- No archive data is modified. No games table is exposed for public writes.
+
+CREATE OR REPLACE FUNCTION public.tma_games_caption_pool(
+    p_year integer DEFAULT NULL,
+    p_class text DEFAULT NULL
+) RETURNS jsonb
+LANGUAGE plpgsql
+STABLE
+SECURITY DEFINER
+SET search_path = ''
+AS $$
+DECLARE
+  v_signature text;
+  v_template uuid;
+  v_slots jsonb;
+  v_items jsonb;
+  v_year integer := p_year;
+  v_class text := NULLIF(btrim(p_class), '');
+BEGIN
+  IF v_year IS NOT NULL AND (v_year < 1996 OR v_year > EXTRACT(YEAR FROM now())::integer) THEN
+    RAISE EXCEPTION 'Year must be between 1996 and the current year';
+  END IF;
+  IF v_class IS NOT NULL AND (length(v_class) > 50 OR v_class !~ '^[a-zA-Z0-9 /-]+$') THEN
+    RAISE EXCEPTION 'Invalid classification';
+  END IF;
+
+  -- Identify the most widely populated compatible 100-point template.
+  WITH round_schemas AS (
+    SELECT r.id AS round_id,
+           string_agg(lower(btrim(s.name)) || ':' || s.max_score::text || ':' || s.multiplier::text,
+                      '|' ORDER BY lower(btrim(s.name))) AS signature,
+           count(*) AS slot_count,
+           sum(s.max_score * s.multiplier) AS total_max
+    FROM public.competition_rounds r
+    JOIN public.competitions c ON c.id = r.competition_id
+    JOIN public.score_captions s ON s.round_id = r.id
+    WHERE c.organization_code = 'KMEA'
+      AND c.season_year >= 1996
+      AND (v_year IS NULL OR c.season_year = v_year)
+      AND c.publication_status = 'published'
+      AND c.archived_at IS NULL AND r.archived_at IS NULL
+    GROUP BY r.id
+    HAVING count(*) BETWEEN 3 AND 12
+       AND abs(sum(s.max_score * s.multiplier) - 100) < 0.001
+  ), populated AS (
+    SELECT rs.signature, min(rs.round_id::text)::uuid AS sample_round,
+           count(DISTINCT rs.round_id) AS round_count,
+           count(DISTINCT cs.entry_id) AS score_count
+    FROM round_schemas rs
+    JOIN public.score_captions s ON s.round_id = rs.round_id
+    JOIN public.caption_scores cs ON cs.caption_id = s.id
+    JOIN public.competition_entries e ON e.id = cs.entry_id AND e.round_id = s.round_id
+    JOIN public.bands b ON b.id = e.band_id
+    WHERE b.archived_at IS NULL
+      AND (v_class IS NULL OR upper(btrim(e.classification)) = upper(v_class))
+      AND cs.score BETWEEN 0 AND s.max_score
+    GROUP BY rs.signature
+  )
+  SELECT p.signature, p.sample_round INTO v_signature, v_template
+  FROM populated p
+  ORDER BY p.score_count DESC, p.round_count DESC, p.signature
+  LIMIT 1;
+
+  IF v_signature IS NULL THEN
+    RETURN jsonb_build_object('slots', '[]'::jsonb, 'candidates', '[]'::jsonb,
+      'message', 'No complete published KMEA caption recaps match these filters yet.');
+  END IF;
+
+  SELECT coalesce(jsonb_agg(jsonb_build_object(
+    'key', lower(btrim(s.name)),
+    'name', s.name,
+    'maximum', s.max_score,
+    'multiplier', s.multiplier
+  ) ORDER BY s.sort_order, s.name), '[]'::jsonb)
+  INTO v_slots
+  FROM public.score_captions s WHERE s.round_id = v_template;
+
+  -- Collect scores from strictly identical layouts (no invented normalization).
+  WITH valid_rounds AS (
+    SELECT r.id,
+      string_agg(lower(btrim(sc.name)) || ':' || sc.max_score::text || ':' || sc.multiplier::text,
+                 '|' ORDER BY lower(btrim(sc.name))) AS signature
+    FROM public.competition_rounds r
+    JOIN public.competitions c ON c.id = r.competition_id
+    JOIN public.score_captions sc ON sc.round_id = r.id
+    WHERE c.organization_code = 'KMEA' AND c.season_year >= 1996
+      AND (v_year IS NULL OR c.season_year = v_year)
+      AND c.publication_status = 'published'
+      AND c.archived_at IS NULL AND r.archived_at IS NULL
+    GROUP BY r.id
+  ), ranked AS (
+    SELECT lower(btrim(s.name)) AS slot_key, cs.entry_id::text || ':' || s.id::text AS key,
+      b.name AS band, b.slug AS band_slug, c.name AS competition,
+      c.season_year AS year, c.source_url AS source_url,
+      r.name AS round_name, e.classification, cs.score,
+      s.multiplier, s.max_score AS maximum,
+      row_number() OVER (
+        PARTITION BY lower(btrim(s.name))
+        ORDER BY md5(e.id::text || ':' || s.id::text)
+      ) AS rank_no
+    FROM valid_rounds vr
+    JOIN public.competition_rounds r ON r.id = vr.id
+    JOIN public.competitions c ON c.id = r.competition_id
+    JOIN public.score_captions s ON s.round_id = r.id
+    JOIN public.caption_scores cs ON cs.caption_id = s.id
+    JOIN public.competition_entries e ON e.id = cs.entry_id AND e.round_id = s.round_id
+    JOIN public.bands b ON b.id = e.band_id
+    WHERE vr.signature = v_signature
+      AND b.archived_at IS NULL
+      AND (v_class IS NULL OR upper(btrim(e.classification)) = upper(v_class))
+      AND cs.score >= 0 AND cs.score <= s.max_score
+  )
+  SELECT coalesce(jsonb_agg(jsonb_build_object(
+     'slotKey', slot_key, 'key', key, 'band', band,
+     'bandSlug', band_slug, 'competition', competition,
+     'year', year, 'sourceUrl', source_url, 'round', round_name,
+     'classification', classification,
+     'score', score, 'maximum', maximum, 'multiplier', multiplier
+  ) ORDER BY slot_key, rank_no), '[]'::jsonb)
+  INTO v_items
+  FROM ranked WHERE rank_no <= 120;
+
+  RETURN jsonb_build_object('slots', v_slots, 'candidates', v_items,
+    'message', NULL, 'organization', 'KMEA', 'firstYear', 1996);
+END;
+$$;
+
+REVOKE ALL ON FUNCTION public.tma_games_caption_pool(integer, text) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.tma_games_caption_pool(integer, text) TO anon, authenticated;
+COMMENT ON FUNCTION public.tma_games_caption_pool(integer, text) IS
+  'Read-only published KMEA 1996+ caption pool; exact matching score schemas and no score normalization.';
