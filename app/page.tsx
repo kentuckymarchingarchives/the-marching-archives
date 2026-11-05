@@ -1,5 +1,6 @@
 
 import Link from "next/link";
+import DiscoveryHub from "@/components/DiscoveryHub";
 import LatestArchiveUpdates from "@/components/LatestArchiveUpdates";
 import LatestArchiveActivity from "@/components/LatestArchiveActivity";
 
@@ -249,6 +250,9 @@ export default function HomePage() {
 
       {/* Automatically generated archive activity */}
       <LatestArchiveActivity />
+
+      {/* Five ways to discover historical records */}
+      <DiscoveryHub />
 
       {/* MADE FOR CURIOSITY */}
       <section className="border-y border-[#e1e6eb] bg-white">
