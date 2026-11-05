@@ -1,108 +1,53 @@
 import { Suspense } from "react";
 import Link from "next/link";
-import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { saveStaffMember, saveStaffBio, setPublicTeamVisibility } from "./actions";
 
-type Staff = { user_id: string; role: string; status: string; created_at: string; display_name: string | null; greeting_name: string | null; staff_title: string | null; biography: string | null; research_specialties: string | null; profile_photo_url: string | null; show_on_public_team: boolean };
-type Props = { searchParams: Promise<{ error?: string; saved?: string; profileSaved?: string; visibilitySaved?: string }> };
-
-const messages: Record<string,string> = {
-  invalid: "Enter a valid UID, role, status, and names within the allowed lengths.",
-  "last-owner": "The last active Owner cannot be demoted or deactivated.",
-  forbidden: "Only active Owners may modify staff accounts.",
-  "no-user": "That UID does not exist in Supabase Authentication.",
-  save: "The change could not be saved. Check the UID and database migration.",
-  "invalid-profile": "Check profile field lengths and use a valid HTTPS photo URL.",
-  "profile-save": "Could not update staff profile. Confirm migration 026 is installed.",
-  "public-team": "Could not update public visibility. Staff must be active and have a Display name. Confirm migration 027 is installed.",
+type PublicMember = {
+  display_name: string;
+  staff_title: string | null;
+  biography: string | null;
+  research_specialties: string | null;
+  profile_photo_url: string | null;
 };
 
-async function TeamContent({ searchParams }: Props) {
+function initials(name: string) {
+  return name.trim().split(/\s+/).slice(0, 2).map(part => part.slice(0, 1)).join("").toUpperCase();
+}
+
+async function TeamContents() {
   const supabase = await createClient();
-  const { data: auth, error: authError } = await supabase.auth.getClaims();
-  const userId = auth?.claims?.sub;
-  if (authError || !userId) redirect("/staff/login");
-  const { data: current, error: staffError } = await supabase
-    .from("staff_members").select("role,status").eq("user_id", userId).maybeSingle();
-  if (staffError || current?.role !== "owner" || current.status !== "active") {
-    redirect("/staff/dashboard");
-  }
-  const { data, error: listError } = await supabase.from("staff_members")
-    .select("user_id,role,status,created_at,display_name,greeting_name,staff_title,biography,research_specialties,profile_photo_url,show_on_public_team").order("created_at", { ascending: true });
-  const rows = (data ?? []) as Staff[];
-  const params = await searchParams;
-  const ownerCount = rows.filter(row => row.role === "owner" && row.status === "active").length;
+  // Safe public RPC: only opted-in active staff, no authentication identifiers.
+  const { data, error } = await supabase.rpc("tma_public_team");
+  const members = (data ?? []) as PublicMember[];
 
   return <main className="min-h-screen bg-[#f6f7f9] text-[#002144]">
-    <div className="bg-[#002144] text-white"><div className="mx-auto max-w-6xl px-5 py-10 sm:px-8">
-      <Link href="/staff/dashboard" className="text-sm text-slate-200 hover:text-white">← Staff dashboard</Link>
-      <p className="mt-7 text-xs font-bold uppercase tracking-widest text-[#f0bfce]">Owner tools</p>
-      <h1 className="mt-2 text-3xl font-extrabold sm:text-4xl">Staff management</h1>
-      <p className="mt-3 max-w-2xl text-sm text-slate-200">Manage names, greetings, roles, and account access. Changes take effect in your existing permission checks.</p>
-    </div></div>
-    <div className="mx-auto max-w-6xl space-y-8 px-5 py-8 sm:px-8">
-      {params.visibilitySaved === "1" && <p role="status" className="rounded-lg border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-900">Public team visibility updated.</p>}
-      {params.profileSaved === "1" && <p role="status" className="rounded-lg border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-900">Staff profile updated.</p>}
-      {params.saved === "1" && <p role="status" className="rounded-lg border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-900">Staff access updated.</p>}
-      {params.error && <p role="alert" className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-900">{messages[params.error] ?? messages.save}</p>}
-      <section className="grid gap-4 sm:grid-cols-3">
-        {[{label:"Staff accounts",value:rows.length},{label:"Active Owners",value:ownerCount},{label:"Active staff",value:rows.filter(x=>x.status==="active").length}].map(item =>
-          <div key={item.label} className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm"><p className="text-sm text-slate-600">{item.label}</p><p className="mt-2 text-3xl font-extrabold tabular-nums">{listError ? "—" : item.value}</p></div>
-        )}
-      </section>
-      {listError && <p role="alert" className="rounded-lg bg-red-50 p-4 text-red-900">Unable to load staff members. Check your database permissions.</p>}
-      <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-        <h2 className="text-xl font-bold">Add or promote staff</h2>
-        <p className="mt-2 text-sm text-slate-600">The person must already have a Supabase Authentication account. Enter their UID, names, role, and status. The greeting name appears in “Hello, …!” on their dashboard.</p>
-        <form action={saveStaffMember} className="mt-5 grid gap-4 sm:grid-cols-2 lg:grid-cols-3 lg:items-end">
-          <label className="block text-sm font-semibold">Authentication UID<input required name="user_id" placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx" className="mt-2 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm" /></label>
-          <label className="block text-sm font-semibold">Display name<input name="display_name" maxLength={100} placeholder="Noah Moore" className="mt-2 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm" /></label>
-          <label className="block text-sm font-semibold">Greeting name<input name="greeting_name" maxLength={40} placeholder="Noah or JT" className="mt-2 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm" /></label>
-          <label className="block text-sm font-semibold">Role<select name="role" defaultValue="editor" className="mt-2 w-full rounded-lg border border-slate-300 px-3 py-2"><option value="editor">Editor</option><option value="admin">Administrator</option><option value="owner">Owner</option></select></label>
-          <label className="block text-sm font-semibold">Status<select name="status" defaultValue="active" className="mt-2 w-full rounded-lg border border-slate-300 px-3 py-2"><option value="active">Active</option><option value="inactive">Inactive</option></select></label>
-          <button className="rounded-lg bg-[#861F41] px-5 py-2.5 font-bold text-white hover:bg-[#6d1936]" type="submit">Save staff</button>
-        </form>
-      </section>
-      <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-        <h2 className="text-xl font-bold">Current staff</h2>
-        <p className="mt-2 text-sm text-slate-600">Update roles and deactivate access without deleting authentication accounts. At least one active Owner must remain.</p>
-        <div className="mt-5 space-y-3">
-          {rows.map(member => <form action={saveStaffMember} key={member.user_id} className="grid gap-3 rounded-xl border border-slate-200 p-4 sm:grid-cols-2 lg:grid-cols-3 lg:items-end">
-            <div className="min-w-0 sm:col-span-2 lg:col-span-3"><p className="font-bold text-[#002144]">{member.display_name || member.greeting_name || "Unnamed staff member"}</p><p className="mt-1 text-xs text-slate-500">Supabase UID {member.user_id===userId ? "· You" : ""}</p><p className="break-all font-mono text-xs sm:text-sm">{member.user_id}</p><Link href={`/staff/profiles/${member.user_id}`} className="mt-2 inline-block text-sm font-bold text-[#861F41] hover:underline">View staff profile →</Link><input type="hidden" name="user_id" value={member.user_id}/></div>
-            <label className="text-sm font-semibold">Display name<input name="display_name" maxLength={100} defaultValue={member.display_name ?? ""} placeholder="Full or display name" className="mt-1 block w-full rounded-lg border border-slate-300 px-3 py-2 text-sm" /></label>
-            <label className="text-sm font-semibold">Greeting name<input name="greeting_name" maxLength={40} defaultValue={member.greeting_name ?? ""} placeholder="Name used in greeting" className="mt-1 block w-full rounded-lg border border-slate-300 px-3 py-2 text-sm" /></label>
-            <label className="text-sm font-semibold">Role<select name="role" defaultValue={member.role} className="mt-1 block w-full rounded-lg border border-slate-300 px-3 py-2"><option value="owner">Owner</option><option value="admin">Administrator</option><option value="editor">Editor</option></select></label>
-            <label className="text-sm font-semibold">Status<select name="status" defaultValue={member.status} className="mt-1 block w-full rounded-lg border border-slate-300 px-3 py-2"><option value="active">Active</option><option value="inactive">Inactive</option></select></label>
-            <button type="submit" className="rounded-lg border border-[#002144] px-4 py-2 text-sm font-bold hover:bg-slate-100">Update</button>
-          </form>)}
-          {rows.map(member => <form action={saveStaffBio} key={`bio-${member.user_id}`} className="rounded-xl border border-[#861F41]/20 bg-[#fcf9fa] p-4">
-            <input name="user_id" type="hidden" value={member.user_id}/>
-            <h3 className="text-base font-bold">Profile details · {member.display_name || member.greeting_name || "Unnamed staff member"}</h3>
-            <p className="mt-1 text-xs text-slate-600">Staff-only fields. Save these separately from role and name changes.</p>
-            <div className="mt-4 grid gap-3 sm:grid-cols-2">
-              <label className="text-sm font-semibold">Staff title<input name="staff_title" maxLength={100} defaultValue={member.staff_title ?? ""} placeholder="Founder & Owner" className="mt-1 block w-full rounded-lg border border-slate-300 px-3 py-2"/></label>
-              <label className="text-sm font-semibold">Research specialties<input name="research_specialties" maxLength={300} defaultValue={member.research_specialties ?? ""} placeholder="KMEA history, scoring research" className="mt-1 block w-full rounded-lg border border-slate-300 px-3 py-2"/></label>
-              <label className="text-sm font-semibold sm:col-span-2">Profile photo HTTPS URL<input name="profile_photo_url" type="url" maxLength={500} defaultValue={member.profile_photo_url ?? ""} placeholder="https://example.com/photo.jpg" className="mt-1 block w-full rounded-lg border border-slate-300 px-3 py-2"/></label>
-              <label className="text-sm font-semibold sm:col-span-2">Biography<textarea name="biography" maxLength={1000} rows={4} defaultValue={member.biography ?? ""} placeholder="Research interests, background, and contributions" className="mt-1 block w-full rounded-lg border border-slate-300 px-3 py-2"/></label>
+    <header className="bg-[#002144] text-white">
+      <div className="mx-auto max-w-6xl px-5 py-14 sm:px-8">
+        <p className="text-xs font-bold uppercase tracking-[0.25em] text-[#efbbce]">The Marching Archives</p>
+        <h1 className="mt-3 text-4xl font-extrabold tracking-tight sm:text-5xl">Meet the Team</h1>
+        <p className="mt-4 max-w-2xl text-base leading-relaxed text-slate-200">Meet the people preserving competitive marching arts history, researching results, and keeping historical records accessible.</p>
+      </div>
+    </header>
+    <div className="mx-auto max-w-6xl px-5 py-12 sm:px-8">
+      {error ? <p role="alert" className="rounded-xl border border-red-200 bg-red-50 p-5 text-sm text-red-900">Team information is temporarily unavailable. Please try again later.</p> :
+        members.length === 0 ? <div className="rounded-2xl border border-slate-200 bg-white p-8 text-center"><h2 className="text-xl font-bold">Our team profiles are coming soon</h2><p className="mt-2 text-sm text-slate-600">Check back as we introduce our archive team.</p></div> :
+        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">{members.map((member, index) => <article key={`${member.display_name}-${index}`} className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+          <div className="h-2 bg-[#861F41]" />
+          <div className="p-6">
+            <div className="flex items-center gap-4">
+              {member.profile_photo_url ? <img src={member.profile_photo_url} alt="" referrerPolicy="no-referrer" className="h-20 w-20 shrink-0 rounded-full border border-slate-200 object-cover" /> :
+                <div aria-hidden="true" className="flex h-20 w-20 shrink-0 items-center justify-center rounded-full bg-[#002144] text-xl font-bold text-white">{initials(member.display_name)}</div>}
+              <div className="min-w-0"><h2 className="wrap-break-word text-xl font-extrabold">{member.display_name}</h2>{member.staff_title && <p className="mt-1 wrap-break-word text-sm font-semibold text-[#861F41]">{member.staff_title}</p>}</div>
             </div>
-            <button type="submit" className="mt-4 rounded-lg bg-[#861F41] px-5 py-2.5 text-sm font-bold text-white hover:bg-[#6d1936]">Save profile details</button>
-          </form>)}
-          <div className="mt-8 border-t border-slate-200 pt-6"><h3 className="text-lg font-bold">Public Meet the Team</h3><p className="mt-1 text-sm text-slate-600">Only staff you explicitly publish will appear at <Link href="/team" className="font-semibold text-[#861F41] underline">/team</Link>. The public page uses <strong>Display name</strong>, never Greeting name. Biographies, specialties, titles, and photo URLs will also be public.</p></div>
-          {rows.map(member => <form action={setPublicTeamVisibility} key={`public-${member.user_id}`} className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-200 p-4">
-            <div><p className="font-semibold">{member.display_name || "Display name required"}</p><p className="text-xs text-slate-600">{member.status === "active" ? "Active" : "Inactive"} · {member.role}</p></div>
-            <input type="hidden" name="user_id" value={member.user_id}/>
-            <label className="flex items-center gap-2 text-sm"><input type="checkbox" name="show_on_public_team" defaultChecked={member.show_on_public_team} className="h-4 w-4 accent-[#861F41]"/> Show publicly</label>
-            <button type="submit" className="rounded-lg bg-[#002144] px-4 py-2 text-sm font-semibold text-white hover:bg-[#103b63]">Save visibility</button>
-          </form>)}
-          {!listError && rows.length===0 && <p className="text-sm text-slate-600">No staff accounts were found.</p>}
-        </div>
-      </section>
-      <p className="text-sm text-slate-600">Names are visible to Owners on this page and to each signed-in staff member on their dashboard. Authentication emails are not exposed. Only grant Owner access to trusted administrators.</p>
+            {member.biography && <p className="mt-5 whitespace-pre-line text-sm leading-relaxed text-slate-700">{member.biography}</p>}
+            {member.research_specialties && <div className="mt-5 border-t border-slate-100 pt-4"><h3 className="text-xs font-bold uppercase tracking-wide text-slate-500">Research specialties</h3><div className="mt-3 flex flex-wrap gap-2">{member.research_specialties.split(",").map(x => x.trim()).filter(Boolean).map((specialty, i) => <span key={`${specialty}-${i}`} className="rounded-full bg-[#002144]/5 px-3 py-1 text-xs font-medium text-[#002144]">{specialty}</span>)}</div></div>}
+          </div>
+        </article>)}</div>}
+      <div className="mt-10 text-center"><Link href="/" className="inline-flex items-center rounded-lg border border-[#002144] px-5 py-2.5 text-sm font-semibold hover:bg-white">← Return to the archive</Link></div>
     </div>
   </main>;
 }
 
-export default function StaffTeamPage(props: Props) {
-  return <Suspense fallback={<main className="mx-auto max-w-6xl p-8">Loading staff management…</main>}><TeamContent {...props}/></Suspense>;
+export default function MeetTheTeamPage() {
+  return <Suspense fallback={<main className="min-h-screen p-10 text-center">Loading team profiles…</main>}><TeamContents /></Suspense>;
 }

@@ -113,8 +113,8 @@ async function CompetitionProfile({ params }: Props) {
           <span className="rounded-full border border-white/25 bg-white/10 px-4 py-2 text-xs font-bold text-white">
             {competition.season_year} Season
           </span>
-          <span className="rounded-full border border-emerald-200 bg-emerald-50 px-4 py-2 text-xs font-bold text-emerald-800">
-            Published
+          <span className="rounded-full border border-white/30 bg-white/10 px-4 py-2 text-xs font-bold text-white">
+            Published record
           </span>
         </div>
 
@@ -122,7 +122,7 @@ async function CompetitionProfile({ params }: Props) {
           {competition.name}
         </h1>
 
-        <p className="text-lg text-slate-600">
+        <p className="text-lg text-slate-200">
           {label(competition.competition_type)}
         </p>
         </div>
@@ -227,6 +227,18 @@ async function CompetitionProfile({ params }: Props) {
         )}
       </section>
 
+      <section aria-labelledby="record-context-heading" className="rounded-2xl border border-[#dce4eb] bg-white p-6 sm:p-7">
+        <h2 id="record-context-heading" className="text-xl font-bold text-[#002144]">About this historical record</h2>
+        <p className="mt-3 text-sm leading-7 text-slate-600">
+          Published means this record is available to the public. It does not, by itself,
+          establish independent verification of every score or placement.
+          Use the recorded source below where one is available, and report discrepancies so staff can investigate.
+        </p>
+        <Link href="/corrections" className="mt-4 inline-flex text-sm font-bold text-[#861F41] underline-offset-4 hover:underline">
+          Suggest a correction →
+        </Link>
+      </section>
+
       {competition.notes && (
         <section className="rounded-2xl border border-slate-200 bg-white p-7">
           <h2 className="text-2xl font-bold text-[#002144]">
@@ -251,11 +263,11 @@ async function CompetitionProfile({ params }: Props) {
             rel="noopener noreferrer"
             className="mt-4 inline-block font-bold text-[#861F41]"
           >
-            View Recorded Source ↗
+            Open recorded source (external) ↗
           </a>
         ) : (
           <p className="mt-3 text-sm text-slate-600">
-            No online source has been recorded.
+            No online source has been recorded for this competition. This does not mean the result is incorrect; documentation may still be pending.
           </p>
         )}
       </section>

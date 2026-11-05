@@ -1,3 +1,4 @@
+import StatisticsQuickLinks from "@/components/StatisticsQuickLinks";
 import { Suspense } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
@@ -85,11 +86,10 @@ async function LeaderboardContent({ searchParams }: Props) {
         .in("round_id", ids)
         .order("id", { ascending: true })
         .limit(1001);
-      if ((data?.length ?? 0) > 1000) truncated = true;
       return { data: data as Entry[] | null, error };
     });
   }
-  if (entries.length > ENTRY_LIMIT) truncated = true;
+  if (entries.length > ENTRY_LIMIT || entries.length > 1000) truncated = true;
   entries = entries.slice(0, ENTRY_LIMIT);
 
   const standingsMap = new Map<string, Standing>();
@@ -132,6 +132,7 @@ async function LeaderboardContent({ searchParams }: Props) {
         </div>
       </div>
       <main className="mx-auto max-w-7xl space-y-7 px-6 py-10 sm:px-8">
+      <StatisticsQuickLinks current="/leaderboards" />
         <form method="get" action="/leaderboards" className="grid gap-4 rounded-3xl border border-slate-200 bg-white p-6 shadow-sm sm:grid-cols-2 lg:grid-cols-4">
           <label className="text-sm font-bold text-[#002144]">Season
             <input type="number" name="year" min="1900" max="2200" defaultValue={year} className="mt-2 block w-full rounded-lg border border-slate-300 p-3" required />

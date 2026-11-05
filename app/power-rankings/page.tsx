@@ -1,3 +1,4 @@
+import StatisticsQuickLinks from "@/components/StatisticsQuickLinks";
 import Link from "next/link";
 import { Suspense } from "react";
 import { createClient } from "@/lib/supabase/server";
@@ -32,6 +33,7 @@ async function Content({searchParams}: Props) {
  const overall=sections.filter(s=>s.kind==="overall");
  const classes=sections.filter(s=>s.kind==="class");
  return <main className="min-h-screen bg-[#f6f7f9] text-[#002144]">
+      <div className="mx-auto max-w-7xl px-5 pt-6 sm:px-8"><StatisticsQuickLinks current="/power-rankings" /></div>
   <section className="relative overflow-hidden bg-[#002144] px-6 py-20 text-white"><div className="mx-auto max-w-5xl"><Link href="/leaderboards" className="text-sm font-semibold text-[#e8afc2] hover:underline">← Leaderboards</Link><p className="mt-7 text-xs font-extrabold uppercase tracking-[.23em] text-[#e8afc2]">Curated historical editions</p><h1 className="mt-3 text-4xl font-extrabold tracking-tight sm:text-6xl">Historical <span className="text-[#e8afc2]">Power Rankings.</span></h1><p className="mt-3 max-w-2xl text-slate-200">Archived KMEA and BOA rankings, entered from historical editions—not automatically calculated from competition results.</p></div></section>
   <div className="mx-auto max-w-5xl space-y-6 px-6 py-10">
    <form action="/power-rankings" className="flex flex-wrap items-end gap-4 rounded-3xl border border-slate-200 bg-white p-6 shadow-sm"><label className="grid gap-1 text-sm font-semibold">Organization<select name="organization" defaultValue={organization} className="rounded-lg border p-3"><option>KMEA</option><option>BOA</option></select></label><label className="grid gap-1 text-sm font-semibold">Season<input type="number" name="year" min="1900" max="2100" defaultValue={year??""} placeholder="All years" className="w-36 rounded-lg border p-3"/></label><button className="rounded-lg bg-[#861F41] px-5 py-3 font-bold text-white">Browse rankings</button></form>

@@ -1,3 +1,4 @@
+import StatisticsQuickLinks from "@/components/StatisticsQuickLinks";
 import Link from "next/link";
 import { Suspense } from "react";
 import { createClient } from "@/lib/supabase/server";
@@ -80,6 +81,7 @@ async function ChampionshipContent({ searchParams }: Props) {
       </div>
     </section>
     <main className="mx-auto max-w-7xl px-5 pb-20 sm:px-8">
+      <StatisticsQuickLinks current="/championships" />
       <form action="/championships" method="get" className="relative -mt-8 grid gap-4 rounded-3xl border border-slate-200 bg-white p-6 shadow-lg sm:grid-cols-3">
         <label className="text-sm font-bold text-[#002144]">Season
           <input className={field} name="year" type="number" min="1800" max="2200" defaultValue={year} placeholder="All years" />

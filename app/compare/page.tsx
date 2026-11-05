@@ -1,3 +1,4 @@
+import StatisticsQuickLinks from "@/components/StatisticsQuickLinks";
 import { Suspense } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
@@ -128,6 +129,7 @@ async function CompareContent({ searchParams }: PageProps) {
   ];
   const maxYear = Math.max(1, ...annual.flatMap(x => [x.left, x.right]));
   return <main className="min-h-screen bg-[#f6f7f9] pb-20">
+      <div className="mx-auto max-w-7xl px-5 pt-6 sm:px-8"><StatisticsQuickLinks current="/compare" /></div>
     <header className="bg-[#002144] text-white"><div className="mx-auto max-w-7xl px-6 py-16">
       <Link href="/bands" className="text-sm text-slate-200 hover:text-white">← Bands &amp; Corps</Link>
       <p className="mt-8 text-xs font-bold uppercase tracking-[0.2em] text-[#e8afc2]">The Marching Archives / Analytics</p>

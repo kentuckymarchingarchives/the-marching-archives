@@ -1,3 +1,4 @@
+import StatisticsQuickLinks from "@/components/StatisticsQuickLinks";
 import { Suspense } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
@@ -124,6 +125,7 @@ async function RecordsContent({ searchParams }: Props) {
       <p className="mt-5 max-w-2xl text-base leading-8 text-slate-200">Find notable documented scores and placements, with links to the original competition results.</p>
     </div></header>
     <main className="mx-auto max-w-7xl space-y-8 px-6 py-10 sm:px-8">
+      <StatisticsQuickLinks current="/records" />
       <form method="get" action="/records" className="grid gap-4 rounded-3xl border border-slate-200 bg-white p-6 shadow-sm sm:grid-cols-3">
         <label className="text-sm font-bold text-[#002144]">Organization<select className={INPUT} name="organization" defaultValue={organization}>{ORGANIZATIONS.map(o => <option key={o} value={o}>{o}</option>)}</select></label>
         <label className="text-sm font-bold text-[#002144]">Season<input className={INPUT} name="year" type="number" min="1800" max="2200" defaultValue={year} placeholder="Select a season" /></label>

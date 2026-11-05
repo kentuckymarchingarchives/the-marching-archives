@@ -89,9 +89,9 @@ export default function HomePage() {
               role="search"
               action="/search"
               method="get"
-              className="mt-9 flex max-w-162.5 flex-col gap-2 rounded-2xl bg-white p-2.5 shadow-[0_24px_65px_rgba(0,0,0,.2)] sm:flex-row"
+              className="mt-9 flex max-w-162.5 flex-col gap-2 rounded-2xl bg-white p-2.5 shadow-[0_24px_65px_rgba(0,0,0,.2)] sm:flex-row sm:items-center"
             >
-              <label htmlFor="tma-search" className="sr-only">
+              <label htmlFor="tma-search" className="block px-3 pt-1 text-xs font-bold text-[#002144] sm:sr-only sm:p-0">
                 Search the archive
               </label>
 
@@ -100,12 +100,12 @@ export default function HomePage() {
                 type="search"
                 name="q"
                 placeholder="Search bands, competitions, and years…"
-                className="min-w-0 flex-1 rounded-xl px-4 py-3.5 text-[15px] text-[#002144] outline-none placeholder:text-[#7b8998]"
+                className="min-w-0 w-full flex-1 rounded-xl border border-[#DCE4EB] px-4 py-3.5 text-base text-[#002144] outline-none placeholder:text-[#7b8998] focus-visible:border-[#861F41] focus-visible:ring-2 focus-visible:ring-[#861F41]/30 sm:w-auto sm:border-transparent"
               />
 
               <button
                 type="submit"
-                className="rounded-xl bg-[#861F41] px-7 py-3.5 text-sm font-extrabold text-white transition hover:bg-[#6f1937]"
+                className="min-h-12 w-full rounded-xl bg-[#861F41] px-7 py-3.5 text-sm font-extrabold text-white transition hover:bg-[#6f1937] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#861F41] sm:w-auto"
               >
                 Search the archive ↗
               </button>
@@ -192,7 +192,7 @@ export default function HomePage() {
       </section>
 
       {/* START EXPLORING */}
-      <section className="mx-auto max-w-330 px-6 py-20 md:px-8 md:py-24">
+      <section className="mx-auto max-w-330 px-6 py-14 md:px-8 md:py-20">
         <div className="flex flex-wrap items-end justify-between gap-6">
           <div>
             <p className="tma-eyebrow">Discover the archive</p>
@@ -244,10 +244,7 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* LATEST ARCHIVE NEWS & UPDATES */}
-      <LatestArchiveUpdates />
-      
-      {/* Owner-written news and announcements */}
+      {/* Owner-written news and announcements: render once */}
       <LatestArchiveUpdates />
 
       {/* Automatically generated archive activity */}
@@ -255,7 +252,7 @@ export default function HomePage() {
 
       {/* MADE FOR CURIOSITY */}
       <section className="border-y border-[#e1e6eb] bg-white">
-        <div className="mx-auto grid max-w-330 gap-12 px-6 py-20 md:px-8 lg:grid-cols-[.95fr_1.05fr] lg:items-center">
+        <div className="mx-auto grid max-w-330 gap-12 px-6 py-14 md:px-8 lg:grid-cols-[.95fr_1.05fr] lg:items-center">
           <div>
             <p className="tma-eyebrow">
               Made for curiosity
@@ -311,7 +308,7 @@ export default function HomePage() {
       </section>
 
       {/* MEET THE TEAM */}
-      <section className="mx-auto max-w-330 px-6 py-20 md:px-8">
+      <section className="mx-auto max-w-330 px-6 py-14 md:px-8">
         <div className="rounded-[28px] bg-[#eee9eb] px-8 py-12 sm:px-12 lg:flex lg:items-center lg:justify-between lg:gap-10">
           <div>
             <p className="tma-eyebrow">
