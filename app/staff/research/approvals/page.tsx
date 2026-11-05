@@ -1,3 +1,4 @@
+import ResearchNavigation from "@/components/staff/ResearchNavigation";
 import { Suspense } from "react";
 import Link from "next/link";
 import { redirect } from "next/navigation";
@@ -52,6 +53,7 @@ async function ApprovalContent({ searchParams }: Props) {
       <p className="mt-3 max-w-2xl text-sm leading-7 text-slate-200">Submit completed assignments for independent review. Approval confirms the research task was reviewed; it does not publish or verify competition results.</p>
     </div></header>
     <div className="mx-auto max-w-6xl space-y-7 px-6 py-9">
+      <ResearchNavigation currentPath="/staff/research/approvals" />
       <div className="flex flex-wrap gap-4"><Link href="/staff/research" className="text-sm font-bold text-[#861F41] hover:underline">← Research Assignments</Link><Link href="/staff/priorities" className="text-sm font-bold text-[#861F41] hover:underline">Research Priority Center →</Link></div>
       {params.saved && <p role="status" className="rounded-xl border border-green-200 bg-green-50 p-4 text-sm text-green-900">Research {params.saved === "submitted" ? "submitted for review" : "review decision saved"}.</p>}
       {params.error && <p role="alert" className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-900">{errors[params.error] ?? errors.save}</p>}
